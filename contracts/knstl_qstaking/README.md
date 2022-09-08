@@ -10,6 +10,10 @@ You can run unit tests on this via:
 
 `cargo test`
 
+Or you can checkout schemas via:
+
+`cargo schema`
+
 Once you are happy with the content, you can compile it to wasm via:
 
 ```
@@ -30,3 +34,4 @@ docker run --rm -v "$(pwd)":/code \
 
 
 ## Importing this contract
+
