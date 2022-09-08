@@ -1,4 +1,4 @@
-# Q-Staking Contract
+# Q-Staking-Proxy Contract
 
 This smart contract provides a feature of staking native token and get immediate rewards.
 
