@@ -45,10 +45,12 @@ RES=$(wasmd tx wasm store [wasm_file_name] --from park --gas 10000000 --fees 60u
 ```
 
 For our pre-stored wasm contracts, 
+
 `qstaking`: `4`
+
 `qstaking-proxy`: `5`
+
 `cw20-base`: `6`
-!!!!!!!!! not yet stored
 
 With these wasm code ids, we can start instantiating ( deploying ).
 
