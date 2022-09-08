@@ -32,6 +32,14 @@ docker run --rm -v "$(pwd)":/code \
   cosmwasm/rust-optimizer:0.12.7 ./contracts/knstl_qstaking
   ```
 
+## About This Contract
 
-## Importing this contract
+This smart contract lets user stake to validator that user chose, with additional CW20 token subsidized right away.
 
+With this contract, user can stake their tokens, without any reward loss, and still token being liquid.
+
+## How-to Use
+
+For basic knowledges, see __[here.](https://docs.cosmwasm.com/docs/1.0/getting-started/interact-with-contract)__
+
+On introductions, see __[here.](./INTRO.md)__

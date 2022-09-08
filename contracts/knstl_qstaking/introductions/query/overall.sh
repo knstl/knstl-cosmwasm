@@ -1,0 +1,6 @@
+print "Config Info"
+knstld query wasm contract-state smart $DELEGATOR "{\"config_info\":{}}"
+print "Stake info of Park"
+knstld query wasm contract-state smart $DELEGATOR "{\"staked\":{\"address\": \"$(knstld keys show -a park)\"}}"
+#print "Qdarc amount of Park"
+#knstld query wasm contract-state smart $DELEGATOR "{\"token_info\":{\"address\": \"$(knstld keys show -a park)\"}}"

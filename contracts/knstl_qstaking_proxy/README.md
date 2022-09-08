@@ -28,13 +28,10 @@ docker run --rm -v "$(pwd)":/code \
   cosmwasm/rust-optimizer:0.12.7 ./contracts/knstl_qstaking_proxy
   ```
 
-## Importing this contract
-
-
-## Smart Contract Spec
+## About This Contract
 
 This smart contract is a proxy-contract which can only be called by the one who instantiated, who will be knstld_qstaking in design.
 
 Having this contract, it makes qstaking contract able to create an address for q-staking interactions.
 
-For more details, Check __[HERE](../knstl_qstaking/README.md)__
+For more details, See __[Here](../knstl_qstaking/README.md)__
