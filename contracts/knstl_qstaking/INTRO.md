@@ -32,7 +32,7 @@ broadcast-mode = "sync"
 ## Store Cosmwasm Contract to Chain
 
 In this contract, you need 2 additional contract to interact with, `cw20-base` and `qstaking-proxy`.
-`cw20-base` can be found [here](https://github.com/CosmWasm/cw-plus/contracts/cw20-base), or [here](../../tests) for pre-compiled wasm file.
+`cw20-base` can be found [here](https://github.com/CosmWasm/cw-plus/tree/main/contracts/cw20-base), or [here](../../tests) for pre-compiled wasm file.
 `qstaking-proxy` can be found [here](../knstl_qstaking_proxy/).
 
 Once you have 3 compiled wasm files, you are ready to store those into chain. Or else, you can use our pre-stored wasm contracts.
