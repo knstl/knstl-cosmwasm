@@ -1,5 +1,5 @@
 [package]
-name = "knstl_delegator"
+name = "qstaking-proxy"
 version = "0.1.0"
 edition = "2021"
 authors = ["Sangwoo Park <psangwoo@users.noreply.github.com>"]
@@ -14,8 +14,8 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
+cosmwasm-std = { version = "1.0.0", features= ["staking"] }
 chrono = "0.4"
-cosmwasm-std = { version = "1.0.0" }
 cw-storage-plus = { path = "./../../packages/storage-plus", version = "0.13.4" }
 cw20 = { path = "./../../packages/cw20", version = "0.13.4" }
 cw2 = { path = "./../../packages/cw2", version = "0.13.4" }

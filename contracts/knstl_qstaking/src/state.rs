@@ -6,9 +6,8 @@ use cosmwasm_std::{Addr, Uint128};
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
 pub struct ConfigInfo {
-    pub denom: String,
-    pub reward_denom: String,
-    pub reward_contract : String,
+    pub native_denom: String,
+    pub cw20contract : String,
     pub stake_contract_id : u64,
     pub stake_contract_label: String,
 }

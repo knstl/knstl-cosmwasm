@@ -19,13 +19,14 @@ ls -l knstl_delegator.wasm
 sha256sum knstl_delegator.wasm
 ```
 
-Or for a production-ready (compressed) build, run the following from the repository root:
+Or for a production-ready (compressed) build, run the following from the __repository root__:
 
 ```
 docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_knstl_qdelegate_cache",target=/code/contracts/knstl_qdelegate/target \
+  --mount type=volume,source="$(basename "$(pwd)")_knstl_qstaking_cache",target=/code/contracts/knstl_qstaking/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.12.7 ./contracts/knstl_qdelegate
+  cosmwasm/rust-optimizer:0.12.7 ./contracts/knstl_qstaking
   ```
+
 
 ## Importing this contract

@@ -3,11 +3,12 @@
 use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, WasmMsg, Addr, SubMsg, ReplyOn, Reply};
 use cw2::set_contract_version;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20InstantiateMsg, MinterResponse};
-use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg, StakeInstantiateMsg, StakeExecuteMsg};
+use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::error::ContractError;
 use crate::state::{STAKEINFO, StakeInfo, ConfigInfo, CONFIG, Staked};
 
-const CONTRACT_NAME: &str = "knstl_delegator";
+use qstaking_proxy::msg::{InstantiateMsg as StakeInstantiateMsg, ExecuteMsg as StakeExecuteMsg, QueryMsg as StakeQueryMsg };
+const CONTRACT_NAME: &str = "knstl_qstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOKEN_INIT_ID : u64 = 1;
 const STAKE_INIT_ID : u64 = 2;
@@ -22,11 +23,10 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     CONFIG.save(deps.storage, &ConfigInfo{
-        denom: msg.denom,
-        reward_denom : msg.reward_denom,
-        reward_contract : msg.reward_contract,
-        stake_contract_id : msg.stake_id,
-        stake_contract_label: msg.stake_label,
+        native_denom: msg.denom,
+        cw20contract : String::new(),
+        stake_contract_id : msg.proxy_id,
+        stake_contract_label: msg.proxy_label,
     })?;
 
     let res = Response::new()
@@ -34,7 +34,7 @@ pub fn instantiate(
         id: TOKEN_INIT_ID, 
         msg: CosmosMsg::Wasm(WasmMsg::Instantiate { 
             admin: Some(env.contract.address.to_string()),
-            code_id: msg.tokencontract_id, 
+            code_id: msg.cw20_id, 
             msg: to_binary(&Cw20InstantiateMsg {
                 name: msg.token_name,
                 symbol: msg.token_symbol,
@@ -48,7 +48,7 @@ pub fn instantiate(
                 marketing : None,
             })?, 
             funds: vec![], 
-            label: msg.tokencontract_label ,
+            label: msg.cw20_label ,
         }),
         gas_limit : None,
         reply_on: ReplyOn::Success,
@@ -91,7 +91,7 @@ fn exec_register(
             admin: Some(env.contract.address.to_string()),
             code_id: config.stake_contract_id,
             msg: to_binary(&StakeInstantiateMsg {
-                denom: config.denom,
+                denom: config.native_denom,
                 owner: info.sender,
             })?, 
             funds: vec![], 
@@ -117,7 +117,7 @@ fn exec_handle_stake(
     }
     let received = info.funds.first().unwrap();
     
-    if received.denom != config.denom {
+    if received.denom != config.native_denom {
         return Err(ContractError::UnstakeableTokenSent { denom: received.denom.clone() });
     }
     
@@ -151,7 +151,7 @@ fn exec_handle_stake(
             funds: info.funds.clone(), 
     }))
     .add_message(CosmosMsg::Wasm(WasmMsg::Execute { 
-        contract_addr: config.reward_contract, 
+        contract_addr: config.cw20contract, 
         msg: to_binary(&Cw20ExecuteMsg::Mint { 
             recipient: info.sender.to_string(),
             amount: received.amount,
@@ -199,7 +199,7 @@ fn exec_handle_unstake(
             funds: vec![],
     }))
     .add_message(CosmosMsg::Wasm(WasmMsg::Execute { 
-        contract_addr: config.reward_contract,
+        contract_addr: config.cw20contract,
         msg: to_binary(&Cw20ExecuteMsg::BurnFrom { 
             owner: info.sender.to_string(),
             amount: amount
@@ -324,7 +324,7 @@ fn handle_token_init (
     msg: Reply,
 ) -> Result<Response, ContractError> {
     CONFIG.update(deps.storage, |mut config| -> StdResult<_> {
-        config.reward_contract = cw_utils::parse_reply_instantiate_data(msg).unwrap().contract_address;
+        config.cw20contract = cw_utils::parse_reply_instantiate_data(msg).unwrap().contract_address;
         Ok(config)
     })?;
     Ok(Response::default())
@@ -377,7 +377,7 @@ fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<StakeInfo>{
 fn query_reward_token_amount(deps: Deps, address: Addr) -> StdResult<String> {
     let config = CONFIG.load(deps.storage)?;
     Ok(deps.querier.query_wasm_smart(
-        config.reward_contract,
+        config.cw20contract,
         &Cw20QueryMsg::Balance { address: address.into() },
     )?)
 }
