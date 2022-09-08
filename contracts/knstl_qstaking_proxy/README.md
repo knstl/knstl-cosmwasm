@@ -15,8 +15,8 @@ Once you are happy with the content, you can compile it to wasm via:
 ```
 RUSTFLAGS='-C link-arg=-s' cargo wasm
 cp ../../target/wasm32-unknown-unknown/release/knstl_qstaking_proxy.wasm .
-ls -l knstl_qstaking_proxy.wasm
-sha256sum knstl_qstaking_proxy.wasm
+ls -l qstaking_proxy.wasm
+sha256sum qstaking_proxy.wasm
 ```
 
 Or for a production-ready (compressed) build, run the following from the __repository root__:
@@ -29,3 +29,12 @@ docker run --rm -v "$(pwd)":/code \
   ```
 
 ## Importing this contract
+
+
+## Smart Contract Spec
+
+This smart contract is a proxy-contract which can only be called by the one who instantiated, who will be knstld_qstaking in design.
+
+Having this contract, it makes qstaking contract able to create an address for q-staking interactions.
+
+For more details, Check __[HERE](../knstl_qstaking/README.md)__

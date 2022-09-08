@@ -19,8 +19,8 @@ Once you are happy with the content, you can compile it to wasm via:
 ```
 RUSTFLAGS='-C link-arg=-s' cargo wasm
 cp ../../target/wasm32-unknown-unknown/release/knstl_qstaking.wasm .
-ls -l knstl_qstaking.wasm
-sha256sum knstl_qstaking.wasm
+ls -l qstaking.wasm
+sha256sum qstaking.wasm
 ```
 
 Or for a production-ready (compressed) build, run the following from the __repository root__:
