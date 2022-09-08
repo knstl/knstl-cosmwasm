@@ -1,2 +1,0 @@
-6bf0bf44abdcd72feaa88a33e56d16d62f5f5bd68067c9411cfbe5ae9ca05e21  ./target/wasm32-unknown-unknown/release/delegator.wasm
-23870e2d3806de96373e36b0186a3b5b9008bb76913232251248dd37c18af101  ./target/wasm32-unknown-unknown/release/knstl_delegator.wasm
