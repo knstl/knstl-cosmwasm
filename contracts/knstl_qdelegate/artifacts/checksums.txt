@@ -1,0 +1,2 @@
+95a0f3a395efe8aeaa87e226028e5a40d8bd87aabcf581fad110804d5b4d2142  delegator.wasm
+271b4d786da29524c1b57488e7133ff2a767afcba934c013792502ed8e5ae97f  knstl_delegator.wasm
