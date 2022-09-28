@@ -97,7 +97,6 @@ fn exec_unstake(
     UNBONDED.update(deps.storage, |mut x| -> StdResult<Vec<Unbonded>> {
         x.push(Unbonded { amount: amount, date: env.block.time });
         Ok(x)
-
     })?;
     BONDED.update(deps.storage, |x| -> StdResult<Uint128> {
         Ok(x.saturating_sub(amount))
@@ -154,14 +153,15 @@ fn exec_claim(
     let balance = deps.querier.query_balance(env.contract.address.clone(), config.denom.clone())?;
     let bonded = BONDED.load(deps.storage)?;
     let unbondings = resolve_unbondings(deps.storage, env.clone())?;
+    let unbonded = get_unbonded_amount(deps.storage)?;
     // let compounded_unbondings = resolve_compounded_unbondings(deps.storage, env)?;
     if unbondings.is_zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
     
-    let reward_ratio: Decimal = Decimal::from_ratio(unbondings, bonded + unbondings);  
+    let reward_ratio: Decimal = Decimal::from_ratio(unbondings, bonded + unbonded);  
     let total_unbond = Coin {
-        amount: unbondings + ((balance.amount - unbondings) * reward_ratio * (Decimal::one() - config.commission_rate)),
+        amount: unbondings + ((balance.amount - unbondings ) * reward_ratio * (Decimal::one() - config.commission_rate)),
         denom: config.denom.clone(),
     };
 
@@ -203,7 +203,6 @@ fn exec_withdraw(
     .add_attribute("from", &validator)
     .add_attribute("to", &info.sender);
     Ok(res)
-
 }
 
 fn exec_compound (
@@ -228,8 +227,11 @@ fn exec_compound (
             validator: validator.clone(), 
             amount: Coin { 
                 amount, 
-                denom: config.denom 
+                denom: config.denom.clone(),
     }}))
+    .add_message(CosmosMsg::Bank(
+        BankMsg::Send { to_address: config.community_pool, amount: vec![Coin{amount:amount * config.commission_rate, denom: config.denom }]}
+    ))
     .add_attribute("action", "compound")
     .add_attribute("to", &validator)
     ;
@@ -238,7 +240,7 @@ fn exec_compound (
 
 fn exec_decompound (
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     validator: String,
     amount: Uint128,
@@ -252,7 +254,10 @@ fn exec_decompound (
     COMPOUNDED.update(deps.storage, |x| -> StdResult<Uint128> {
         Ok(x - amount)
     })?;
-
+    UNBONDED.update(deps.storage, |mut x| -> StdResult<Vec<Unbonded>> {
+        x.push(Unbonded { amount: amount, date: env.block.time });
+        Ok(x)
+    })?;
     let res = Response::new()
     .add_message(CosmosMsg::Staking(
         StakingMsg::Undelegate { 
@@ -286,7 +291,16 @@ fn resolve_unbondings(
     })?;
     Ok(ret)
 }
-
+fn get_unbonded_amount(
+    storage: &mut dyn Storage
+)-> StdResult<Uint128> {
+    let unbondeds = UNBONDED.load(storage)?;
+    let mut ret = Uint128::zero();
+    for unbonded in unbondeds.iter() {
+        ret += unbonded.amount
+    }
+    Ok(ret)
+}
 // fn resolve_compounded_unbondings(
 //     storage: &mut dyn Storage,
 //     env: Env,

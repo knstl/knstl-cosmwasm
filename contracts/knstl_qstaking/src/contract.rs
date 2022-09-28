@@ -185,44 +185,64 @@ fn exec_handle_unstake(
     let config = CONFIG.load(deps.storage)?;
     let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
     let staked = stake_info.staked.iter().find(|x| x.validator == validator).unwrap();
-    let compounded = stake_info.compounded.iter().find(|x| x.validator == validator).unwrap();
+    let compounded = stake_info.compounded.iter().find(|x| x.validator == validator);
     if amount > staked.amount {
         return Err(ContractError::InvalidUnstakeAmount {});
     }
     let redeem_rate = Decimal::from_ratio(amount, staked.amount);
+    let res = 
+    match compounded {
+        Some(w) => {
+            let decompound_amount = w.amount * redeem_rate;
 
-    let decompound_amount = compounded.amount * redeem_rate;
-
-    STAKEINFO.update(
-            deps.storage, 
-            &info.sender, 
-            |info| -> StdResult<_> {
-                let mut ret = info.clone().unwrap();
-                ret.staked.retain(|x| x.validator != validator );
-                ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
-                ret.minted -= amount;
-                Ok(ret)
-    })?;
-    let res = Response::new()
+            STAKEINFO.update(
+                    deps.storage, 
+                    &info.sender, 
+                    |info| -> StdResult<_> {
+                        let mut ret = info.clone().unwrap();
+                        ret.staked.retain(|x| x.validator != validator );
+                        ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
+                        ret.minted -= amount;
+                        ret.compounded.retain(|x| x.validator != validator);
+                        ret.compounded.push(Staked {amount: w.amount.checked_sub(decompound_amount).unwrap(), validator: validator.clone() });
+                        Ok(ret)
+            })?;
+            Response::new()
+            .add_message(WasmMsg::Execute { 
+                contract_addr: stake_info.stake_contract.clone(), 
+                msg: to_binary(&StakeExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
+                funds: vec![],
+            })
+        },
+        None => {
+            STAKEINFO.update(
+                    deps.storage, 
+                    &info.sender, 
+                    |info| -> StdResult<_> {
+                        let mut ret = info.clone().unwrap();
+                        ret.staked.retain(|x| x.validator != validator );
+                        ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
+                        ret.minted -= amount;
+                        Ok(ret)
+            })?;
+            Response::new()
+        },
+    }            
     .add_message(WasmMsg::Execute { 
         contract_addr: stake_info.stake_contract.clone(), 
         msg: to_binary(&StakeExecuteMsg::Unstake { amount: amount, validator: validator.to_string() })?,
         funds: vec![],
     })
     .add_message(WasmMsg::Execute { 
-        contract_addr: stake_info.stake_contract.clone(), 
-        msg: to_binary(&StakeExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
-        funds: vec![],
-    })
-    .add_message(WasmMsg::Execute { 
         contract_addr: config.cw20contract,
         msg: to_binary(&Cw20ExecuteMsg::BurnFrom { owner: info.sender.to_string(), amount })?,
         funds: vec![],
-    })
+    })            
     .add_attribute("action", "unstake")
     .add_attribute("from", &info.sender)
     .add_attribute("to", &env.contract.address);
     Ok(res)
+
 }
 
 fn exec_handle_claim (
@@ -253,9 +273,7 @@ fn exec_handle_redelegation (
     to: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> { 
-
     let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    
     let from_info = stake_info.staked.iter().find(|x| x.validator == from);
     
     if from_info == None {
