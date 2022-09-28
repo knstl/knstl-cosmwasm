@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use qstaking::state::{ConfigInfo, StakeInfo};
+use qstaking::state::{Config, StakeInfo};
 use qstaking::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
@@ -15,6 +15,6 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
-    export_schema(&schema_for!(ConfigInfo), &out_dir);
+    export_schema(&schema_for!(Config), &out_dir);
     export_schema(&schema_for!(StakeInfo), &out_dir);
 }

@@ -1,13 +1,14 @@
 
+use cosmwasm_std::Decimal;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, WasmMsg, Addr, SubMsg, ReplyOn, Reply};
 use cw2::set_contract_version;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20InstantiateMsg, MinterResponse};
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::error::ContractError;
-use crate::state::{STAKEINFO, StakeInfo, ConfigInfo, CONFIG, Staked};
+use crate::state::{STAKEINFO, StakeInfo, Config, CONFIG, Staked};
 
-use qstaking_proxy::msg::{InstantiateMsg as StakeInstantiateMsg, ExecuteMsg as StakeExecuteMsg, QueryMsg as StakeQueryMsg };
+use qstaking_proxy::msg::{InstantiateMsg as StakeInstantiateMsg, ExecuteMsg as StakeExecuteMsg};
 const CONTRACT_NAME: &str = "knstl_qstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOKEN_INIT_ID : u64 = 1;
@@ -22,11 +23,14 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    CONFIG.save(deps.storage, &ConfigInfo{
+    CONFIG.save(deps.storage, &Config{
         native_denom: msg.denom,
         cw20contract : String::new(),
         stake_contract_id : msg.proxy_id,
         stake_contract_label: msg.proxy_label,
+        commission_rate: msg.commission_rate,
+        community_pool: msg.community_pool,
+        unbond_period: msg.unbond_period,
     })?;
 
     let res = Response::new()
@@ -71,9 +75,12 @@ pub fn execute(
         ExecuteMsg::Register {} => exec_register(deps, env, info),
         ExecuteMsg::Stake { validator } => exec_handle_stake(deps, env, info, validator),
         ExecuteMsg::Unstake { validator, amount } => exec_handle_unstake(deps, env, info, validator, amount),
-        ExecuteMsg::GetReward {} => exec_handle_withdraw(deps, info),
         ExecuteMsg::Claim {} => exec_handle_claim(deps, info),
         ExecuteMsg::ChangeValidator { from, to, amount } => exec_handle_redelegation(deps, info, from, to, amount),
+        ExecuteMsg::Withdraw { validator } => exec_handle_withdraw(deps, info, validator),
+        ExecuteMsg::WithdrawAll {} => exec_handle_withdraw_all(deps, info),
+        ExecuteMsg::Compound { validator, amount } => exec_handle_compound(deps, env, info, validator, amount),
+        // ExecuteMsg::Decompound { validator, amount } => exec_handle_decompound(deps, env, info, validator, amount),
     }
 }
 
@@ -93,6 +100,9 @@ fn exec_register(
             msg: to_binary(&StakeInstantiateMsg {
                 denom: config.native_denom,
                 owner: info.sender,
+                commission_rate: config.commission_rate,
+                community_pool: config.community_pool,
+                unbond_period: config.unbond_period,
             })?, 
             funds: vec![], 
             label: config.stake_contract_label,
@@ -124,9 +134,9 @@ fn exec_handle_stake(
     let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
     let staked = stake_info.staked.iter().find(|x| x.validator == validator);
 
-    
     STAKEINFO.update(deps.storage, &info.sender, |info| -> StdResult<_> {
         let mut ret = info.clone().unwrap();
+        ret.minted += received.amount;
         Ok(match staked {
             Some(w) => {
                 ret.staked.retain(|x| x.validator != validator);
@@ -142,7 +152,6 @@ fn exec_handle_stake(
             },
     })})?;
 
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
     let res = Response::new()
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
@@ -173,14 +182,17 @@ fn exec_handle_unstake(
     validator: String,
     amount: Uint128,
 )->Result<Response, ContractError> {
-    
     let config = CONFIG.load(deps.storage)?;
     let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
     let staked = stake_info.staked.iter().find(|x| x.validator == validator).unwrap();
-    
+    let compounded = stake_info.compounded.iter().find(|x| x.validator == validator).unwrap();
     if amount > staked.amount {
         return Err(ContractError::InvalidUnstakeAmount {});
     }
+    let redeem_rate = Decimal::from_ratio(amount, staked.amount);
+
+    let decompound_amount = compounded.amount * redeem_rate;
+
     STAKEINFO.update(
             deps.storage, 
             &info.sender, 
@@ -188,51 +200,28 @@ fn exec_handle_unstake(
                 let mut ret = info.clone().unwrap();
                 ret.staked.retain(|x| x.validator != validator );
                 ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
+                ret.minted -= amount;
                 Ok(ret)
     })?;
-
     let res = Response::new()
-    .add_message(CosmosMsg::Wasm(
-        WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&StakeExecuteMsg::Unstake { amount:amount, validator: validator.to_string() })?,
-            funds: vec![],
-    }))
-    .add_message(CosmosMsg::Wasm(WasmMsg::Execute { 
-        contract_addr: config.cw20contract,
-        msg: to_binary(&Cw20ExecuteMsg::BurnFrom { 
-            owner: info.sender.to_string(),
-            amount: amount
-        })?,
+    .add_message(WasmMsg::Execute { 
+        contract_addr: stake_info.stake_contract.clone(), 
+        msg: to_binary(&StakeExecuteMsg::Unstake { amount: amount, validator: validator.to_string() })?,
         funds: vec![],
-    }))
+    })
+    .add_message(WasmMsg::Execute { 
+        contract_addr: stake_info.stake_contract.clone(), 
+        msg: to_binary(&StakeExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
+        funds: vec![],
+    })
+    .add_message(WasmMsg::Execute { 
+        contract_addr: config.cw20contract,
+        msg: to_binary(&Cw20ExecuteMsg::BurnFrom { owner: info.sender.to_string(), amount })?,
+        funds: vec![],
+    })
     .add_attribute("action", "unstake")
     .add_attribute("from", &info.sender)
     .add_attribute("to", &env.contract.address);
-    Ok(res)
-}
-
-fn exec_handle_withdraw(
-    deps: DepsMut, 
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    let mut withdraw_msgs: Vec<CosmosMsg> = vec![];
-
-    for staked in stake_info.staked.clone() {
-        if !staked.amount.is_zero() {
-        withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract.clone(),
-            msg: to_binary(&StakeExecuteMsg::Withdraw { validator: staked.validator })?, 
-            funds: vec![],
-    }}))}}
-    
-    let res = Response::new()
-    .add_messages(withdraw_msgs)
-    .add_attribute("action", "withdraw_rewards")
-    .add_attribute("from", &info.sender)
-    ;
     Ok(res)
 }
 
@@ -248,7 +237,7 @@ fn exec_handle_claim (
     .add_message(CosmosMsg::Wasm({
         WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&StakeExecuteMsg::Claim{})?, 
+            msg: to_binary(&StakeExecuteMsg::Claim {})?, 
             funds: vec![],
     }}))
     .add_attribute("action", "claim")
@@ -283,7 +272,6 @@ fn exec_handle_redelegation (
         })?;
     }
     
-
     STAKEINFO.update(
         deps.storage, 
         &info.sender, 
@@ -306,6 +294,126 @@ fn exec_handle_redelegation (
     }));
     Ok(res)
 }
+
+fn exec_handle_withdraw(
+    deps: DepsMut, 
+    info: MessageInfo,
+    validator: String,
+) -> Result<Response, ContractError> {
+    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
+
+    let res = Response::new()
+    .add_message(WasmMsg::Execute { 
+        contract_addr: stake_info.stake_contract.clone(),
+        msg: to_binary(&StakeExecuteMsg::Withdraw { validator })?, 
+        funds: vec![],
+    })
+    .add_attribute("action", "withdraw_rewards")
+    .add_attribute("from", &info.sender)
+    ;
+    Ok(res)
+}
+
+fn exec_handle_withdraw_all(
+    deps: DepsMut, 
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+
+    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
+    let mut withdraw_msgs: Vec<CosmosMsg> = vec![];
+
+    for staked in stake_info.staked.clone() {
+        if !staked.amount.is_zero() {
+        withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
+            contract_addr: stake_info.stake_contract.clone(),
+            msg: to_binary(&StakeExecuteMsg::Withdraw { validator: staked.validator })?, 
+            funds: vec![],
+    }}))}}
+    
+    let res = Response::new()
+    .add_messages(withdraw_msgs)
+    .add_attribute("action", "withdraw_rewards")
+    .add_attribute("from", &info.sender)
+    ;
+    Ok(res)
+}
+
+fn exec_handle_compound (
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    validator: String,
+    amount: Uint128,
+) -> Result<Response, ContractError> { 
+    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
+    let compounded = stake_info.compounded.iter().find(|x| x.validator == validator);
+
+    STAKEINFO.update(deps.storage, &info.sender, |info| -> StdResult<_> {
+        let mut ret = info.clone().unwrap();
+        Ok(match compounded {
+            Some(w) => {
+                ret.compounded.retain(|x| x.validator != validator);
+                ret.compounded.push(Staked{
+                    amount: w.amount + amount,
+                    validator: validator.clone(),
+                });
+                ret
+            },
+            None => {
+                ret.compounded.push(Staked { amount: amount, validator: validator.clone()});
+                ret 
+            },
+    })})?;
+
+    let res = Response::new()
+    .add_message(CosmosMsg::Wasm(
+        WasmMsg::Execute { 
+            contract_addr: stake_info.stake_contract, 
+            msg: to_binary(&StakeExecuteMsg::Compound { validator: validator.clone(), amount })?, 
+            funds: info.funds.clone(), 
+    }))
+    .add_attribute("action", "compound")
+    .add_attribute("from", &info.sender)
+    .add_attribute("to", &env.contract.address)
+    .add_attribute("validator", &validator);
+    
+    Ok(res)
+}
+// fn exec_handle_decompound (
+//     deps: DepsMut,
+//     env: Env,
+//     info: MessageInfo,
+//     validator: String,
+//     amount: Uint128,
+// ) -> Result<Response, ContractError> { 
+//     let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
+//     let compounded = stake_info.compounded.iter().find(|x| x.validator == validator).unwrap();
+    
+//     if amount > compounded.amount {
+//         return Err(ContractError::InvalidUnstakeAmount {});
+//     }
+//     STAKEINFO.update(
+//             deps.storage, 
+//             &info.sender, 
+//             |info| -> StdResult<_> {
+//                 let mut ret = info.clone().unwrap();
+//                 ret.compounded.retain(|x| x.validator != validator );
+//                 ret.compounded.push(Staked { amount: compounded.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
+//                 Ok(ret)
+//     })?;
+
+//     let res = Response::new()
+//     .add_message(CosmosMsg::Wasm(
+//         WasmMsg::Execute { 
+//             contract_addr: stake_info.stake_contract, 
+//             msg: to_binary(&StakeExecuteMsg::Decompound { validator, amount } )?,
+//             funds: vec![],
+//     }))
+//     .add_attribute("action", "unstake")
+//     .add_attribute("from", &info.sender)
+//     .add_attribute("to", &env.contract.address);
+//     Ok(res)
+// }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(
@@ -352,7 +460,9 @@ fn handle_stake_init (
     
     STAKEINFO.save(deps.storage, &deps.api.addr_validate(&owner).unwrap(), &StakeInfo { 
         staked: vec![],
+        compounded: vec![],
         stake_contract: cw_utils::parse_reply_instantiate_data(msg).unwrap().contract_address,
+        minted: Uint128::zero(),
     })?;
     Ok(Response::default())
 }
@@ -382,7 +492,7 @@ fn query_reward_token_amount(deps: Deps, address: Addr) -> StdResult<String> {
     )?)
 }
 
-fn query_config(deps: Deps) -> StdResult<ConfigInfo> {
+fn query_config(deps: Deps) -> StdResult<Config> {
     let config = CONFIG.load(deps.storage)?;
     Ok(config)
 }
