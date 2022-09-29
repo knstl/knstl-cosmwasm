@@ -33,6 +33,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     ConfigInfo {},
+    AccountInfo {address: Addr},
     Staked {address: Addr},
     TokenInfo {address: Addr},
 }

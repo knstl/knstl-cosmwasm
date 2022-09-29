@@ -8,7 +8,7 @@ use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::error::ContractError;
 use crate::state::{STAKEINFO, StakeInfo, Config, CONFIG, Staked};
 
-use qstaking_proxy::msg::{InstantiateMsg as StakeInstantiateMsg, ExecuteMsg as StakeExecuteMsg};
+use qstaking_proxy::msg::{InstantiateMsg as ProxyInstantiateMsg, ExecuteMsg as ProxyExecuteMsg};
 const CONTRACT_NAME: &str = "knstl_qstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOKEN_INIT_ID : u64 = 1;
@@ -97,7 +97,7 @@ fn exec_register(
         msg: CosmosMsg::Wasm(WasmMsg::Instantiate { 
             admin: Some(env.contract.address.to_string()),
             code_id: config.stake_contract_id,
-            msg: to_binary(&StakeInstantiateMsg {
+            msg: to_binary(&ProxyInstantiateMsg {
                 denom: config.native_denom,
                 owner: info.sender,
                 commission_rate: config.commission_rate,
@@ -156,7 +156,7 @@ fn exec_handle_stake(
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&StakeExecuteMsg::Stake { validator: validator.clone() })?, 
+            msg: to_binary(&ProxyExecuteMsg::Stake { validator: validator.clone() })?, 
             funds: info.funds.clone(), 
     }))
     .add_message(CosmosMsg::Wasm(WasmMsg::Execute { 
@@ -210,7 +210,7 @@ fn exec_handle_unstake(
             Response::new()
             .add_message(WasmMsg::Execute { 
                 contract_addr: stake_info.stake_contract.clone(), 
-                msg: to_binary(&StakeExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
+                msg: to_binary(&ProxyExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
                 funds: vec![],
             })
         },
@@ -230,7 +230,7 @@ fn exec_handle_unstake(
     }            
     .add_message(WasmMsg::Execute { 
         contract_addr: stake_info.stake_contract.clone(), 
-        msg: to_binary(&StakeExecuteMsg::Unstake { amount: amount, validator: validator.to_string() })?,
+        msg: to_binary(&ProxyExecuteMsg::Unstake { amount: amount, validator: validator.to_string() })?,
         funds: vec![],
     })
     .add_message(WasmMsg::Execute { 
@@ -257,7 +257,7 @@ fn exec_handle_claim (
     .add_message(CosmosMsg::Wasm({
         WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&StakeExecuteMsg::Claim {})?, 
+            msg: to_binary(&ProxyExecuteMsg::Claim {})?, 
             funds: vec![],
     }}))
     .add_attribute("action", "claim")
@@ -275,7 +275,7 @@ fn exec_handle_redelegation (
 ) -> Result<Response, ContractError> { 
     let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
     let from_info = stake_info.staked.iter().find(|x| x.validator == from);
-    
+
     if from_info == None {
         return Err(ContractError::InvalidRequest { });
     } else if from_info.unwrap().amount < amount {
@@ -307,7 +307,7 @@ fn exec_handle_redelegation (
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&StakeExecuteMsg::Restake { from, to, amount })?,
+            msg: to_binary(&ProxyExecuteMsg::Restake { from, to, amount })?,
             funds: vec![],
     }));
     Ok(res)
@@ -323,7 +323,7 @@ fn exec_handle_withdraw(
     let res = Response::new()
     .add_message(WasmMsg::Execute { 
         contract_addr: stake_info.stake_contract.clone(),
-        msg: to_binary(&StakeExecuteMsg::Withdraw { validator })?, 
+        msg: to_binary(&ProxyExecuteMsg::Withdraw { validator })?, 
         funds: vec![],
     })
     .add_attribute("action", "withdraw_rewards")
@@ -344,7 +344,7 @@ fn exec_handle_withdraw_all(
         if !staked.amount.is_zero() {
         withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract.clone(),
-            msg: to_binary(&StakeExecuteMsg::Withdraw { validator: staked.validator })?, 
+            msg: to_binary(&ProxyExecuteMsg::Withdraw { validator: staked.validator })?, 
             funds: vec![],
     }}))}}
     
@@ -387,7 +387,7 @@ fn exec_handle_compound (
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&StakeExecuteMsg::Compound { validator: validator.clone(), amount })?, 
+            msg: to_binary(&ProxyExecuteMsg::Compound { validator: validator.clone(), amount })?, 
             funds: info.funds.clone(), 
     }))
     .add_attribute("action", "compound")
@@ -424,7 +424,7 @@ fn exec_handle_compound (
 //     .add_message(CosmosMsg::Wasm(
 //         WasmMsg::Execute { 
 //             contract_addr: stake_info.stake_contract, 
-//             msg: to_binary(&StakeExecuteMsg::Decompound { validator, amount } )?,
+//             msg: to_binary(&ProxyExecuteMsg::Decompound { validator, amount } )?,
 //             funds: vec![],
 //     }))
 //     .add_attribute("action", "unstake")
@@ -495,6 +495,7 @@ pub fn query(
         QueryMsg::Staked { address } => to_binary(&query_stake_amount(deps, address)?),
         QueryMsg::ConfigInfo {} => to_binary(&query_config(deps)?),
         QueryMsg::TokenInfo { address } => to_binary(&query_reward_token_amount(deps, address)?),
+        QueryMsg::AccountInfo { address } => to_binary(&query_account_info(deps, address)?),
     }
 }
 fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<StakeInfo>{
@@ -513,4 +514,8 @@ fn query_reward_token_amount(deps: Deps, address: Addr) -> StdResult<String> {
 fn query_config(deps: Deps) -> StdResult<Config> {
     let config = CONFIG.load(deps.storage)?;
     Ok(config)
+}
+
+fn query_account_info (deps: Deps, address: Addr) -> StdResult<bool> {
+    Ok(STAKEINFO.has(deps.storage, &address))
 }
