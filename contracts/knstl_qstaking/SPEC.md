@@ -39,7 +39,7 @@ Once you have 3 compiled wasm files, you are ready to store those into chain. Or
 
 Storing wasm file is done via:
 ```
-RES=$(wasmd tx wasm store [wasm_file_name] --from park --fees 6udarc --gas 1000000 -y -b block )
+RES=$(knstld tx wasm store [wasm_file_name] --from user --fees 6udarc --gas 1000000 -y -b block )
 && CODE_ID=$(echo $RES | jq -r '.logs[0].events[-1].attributes[0].value') && echo $CODE_ID
 # not working well, will edit properly
 ```
@@ -61,12 +61,12 @@ First thing to do is instantiate contract, done via:
 QSTAKING_ID=34
 QSTAKING_PROXY_ID=33
 CW20_ID=7
-COMMUNITY_POOL=$(wasmd keys show -a community)
+COMMUNITY_POOL=$(knstld keys show -a community)
 INIT_MSG="{\"denom\" : \"udarc\", \"cw20_id\" : $CW20_ID, \"cw20_label\": \"crates.io:cw20-base\", \"token_name\": \"qdarc\", \"token_symbol\": \"qdarc\", \"proxy_id\": $QSTAKING_PROXY_ID, \"proxy_label\": \"knstl_qstaking_proxy\", \"commission_rate\": \"0.15\", \"community_pool\": \"$COMMUNITY_POOL\", \"unbond_period\": 120 }"
 
-knstld tx wasm instantiate $QSTAKING_ID $INIT_MSG --from park --label "knstl_qstaking" -y --fees 6udarc --gas 1000000 -b block --no-admin
+knstld tx wasm instantiate $QSTAKING_ID $INIT_MSG --from user --label "knstl_qstaking" -y --fees 6udarc --gas 1000000 -b block --no-admin
 
-DELEGATOR=$(wasmd query wasm list-contract-by-code $QSTAKING_ID --output json | jq -r '.contracts[-1]')
+DELEGATOR=$(knstld query wasm list-contract-by-code $QSTAKING_ID --output json | jq -r '.contracts[-1]')
 
 ```
 

@@ -16,7 +16,7 @@ of any CW2-compliant contract.
 
 You can query using:
 ```shell
-wasmd query wasm contract-state raw [contract_addr] 636F6E74726163745F696E666F --node $RPC
+knstld query wasm contract-state raw [contract_addr] 636F6E74726163745F696E666F --node $RPC
 ```
 
 When the `migrate` function is called, then the new contract
