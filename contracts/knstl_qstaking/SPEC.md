@@ -46,9 +46,9 @@ RES=$(wasmd tx wasm store [wasm_file_name] --from park --gas 10000000 --fees 60u
 
 For our pre-stored wasm contracts, 
 
-`qstaking`: `5`
+`qstaking`: `34`
 
-`qstaking-proxy`: `6`
+`qstaking-proxy`: `33`
 
 `cw20-base`: `7`
 

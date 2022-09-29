@@ -1,14 +1,12 @@
-
-use cosmwasm_std::Decimal;
 #[cfg(not(feature = "library"))]
-use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, WasmMsg, Addr, SubMsg, ReplyOn, Reply};
+use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, WasmMsg, Addr, SubMsg, ReplyOn, Reply, Decimal};
 use cw2::set_contract_version;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20InstantiateMsg, MinterResponse};
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::error::ContractError;
 use crate::state::{STAKEINFO, StakeInfo, Config, CONFIG, Staked};
-
 use qstaking_proxy::msg::{InstantiateMsg as ProxyInstantiateMsg, ExecuteMsg as ProxyExecuteMsg};
+
 const CONTRACT_NAME: &str = "knstl_qstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOKEN_INIT_ID : u64 = 1;
