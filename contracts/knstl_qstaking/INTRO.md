@@ -85,7 +85,7 @@ knstld tx wasm execute $DELEGATOR $REGISTER_MSG --from [user_name]  --fees 10uda
 After registration, user can execute either 
 - Stake
 - Unstake ( if staked any )
-- ChangeValidator
+- Restake
 - Claim ( only reward request )
 - GetReward
   

@@ -22,7 +22,7 @@ pub enum ExecuteMsg {
     Register {},
     Stake { validator: String },
     Unstake { validator: String, amount : Uint128 },
-    ChangeValidator {from: String, to: String, amount: Uint128},
+    Restake {from: String, to: String, amount: Uint128},
     Claim {},
     Withdraw {validator: String},
     WithdrawAll {},
