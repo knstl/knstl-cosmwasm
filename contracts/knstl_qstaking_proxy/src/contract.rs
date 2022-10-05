@@ -221,6 +221,7 @@ fn exec_compound (
         Ok(x + amount)
     })?;
 
+    
     let res = Response::new()
     .add_message(CosmosMsg::Staking(
         StakingMsg::Delegate { 
@@ -230,8 +231,13 @@ fn exec_compound (
                 denom: config.denom.clone(),
     }}))
     .add_message(CosmosMsg::Bank(
-        BankMsg::Send { to_address: config.community_pool, amount: vec![Coin{amount:amount * config.commission_rate, denom: config.denom }]}
-    ))
+        BankMsg::Send { 
+            to_address: config.community_pool, 
+            amount: vec![Coin{
+                amount: amount * (config.commission_rate / (Decimal::one() - config.commission_rate)),
+                denom: config.denom 
+        }]
+    }))
     .add_attribute("action", "compound")
     .add_attribute("to", &validator)
     ;
