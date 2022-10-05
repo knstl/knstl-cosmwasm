@@ -1,6 +1,5 @@
-use cosmwasm_std::{Decimal, Storage};
 #[cfg(not(feature = "library"))]
-use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, StakingMsg, Coin, BankMsg, DistributionMsg };
+use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, StakingMsg, Coin, BankMsg, DistributionMsg, Decimal, Storage };
 use cw2::set_contract_version;
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::error::ContractError;
@@ -40,9 +39,9 @@ pub fn execute(
     match msg {
         ExecuteMsg::Stake { validator } => exec_stake(deps, env, info, validator),
         ExecuteMsg::Unstake { validator, amount } => exec_unstake(deps, env, info, validator, amount),
-        ExecuteMsg::Claim {} => exec_claim(deps, env, info),
+        ExecuteMsg::Withdraw {} => exec_withdraw(deps, env, info),
         ExecuteMsg::Restake {from, to, amount} => exec_restake(deps, env, info, from, to, amount),
-        ExecuteMsg::Withdraw {validator} => exec_withdraw(deps, info, validator),
+        ExecuteMsg::Claim {validator} => exec_claim(deps, info, validator),
         ExecuteMsg::Compound { validator, amount } => exec_compound(deps, info, validator, amount),
         ExecuteMsg::Decompound { validator, amount } => exec_decompound(deps, env, info, validator, amount),
     }
@@ -141,7 +140,7 @@ fn exec_restake(
     .add_attribute("by", env.contract.address);
     Ok(res)
 }
-fn exec_claim(
+fn exec_withdraw(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -178,14 +177,14 @@ fn exec_claim(
         amount: vec![commission],
         to_address: config.community_pool,
     })
-    .add_attribute("action", "claim")
+    .add_attribute("action", "withdraw")
     .add_attribute("from", &config.owner)
     .add_attribute("to", &info.sender)
     ;
     Ok(res)
 }
 
-fn exec_withdraw(
+fn exec_claim(
     deps: DepsMut,
     info: MessageInfo,
     validator: String,
@@ -199,7 +198,7 @@ fn exec_withdraw(
     .add_message(CosmosMsg::Distribution(
         DistributionMsg::WithdrawDelegatorReward { validator: validator.clone() }
     ))
-    .add_attribute("action", "withdraw")
+    .add_attribute("action", "claim")
     .add_attribute("from", &validator)
     .add_attribute("to", &info.sender);
     Ok(res)
@@ -327,12 +326,13 @@ fn get_unbonded_amount(
 #[entry_point]
 pub fn query(
     deps: Deps,
-    _env: Env,
+    env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::ConfigInfo {} => to_binary(&query_config(deps)?),
         QueryMsg::Unbondings {} => to_binary(&query_unbondings(deps)?),
+        QueryMsg::Rewards {} => to_binary(&query_rewards(deps, env)?),
     }
 }
 
@@ -341,4 +341,24 @@ fn query_config(deps: Deps)-> StdResult<Config>{
 }
 fn query_unbondings(deps: Deps)-> StdResult<Vec<Unbonded>>{
     Ok(UNBONDED.load(deps.storage)?)
+}
+fn query_rewards(deps: Deps, env: Env) -> StdResult<Uint128> {
+    let config = CONFIG.load(deps.storage)?;
+    let balance = deps.querier.query_balance(env.contract.address.clone(), config.denom.clone())?;
+    let bonded = BONDED.load(deps.storage)?;
+    let mut unbondings = Uint128::zero();
+    let unbondeds = UNBONDED.load(deps.storage)?;
+    for unbonded in unbondeds.iter() {
+        if env.block.time.seconds() - unbonded.date.seconds() >= config.unbond_period {
+            unbondings += unbonded.amount;
+        } 
+    }
+    let mut unbonded = Uint128::zero();
+    for unbond in unbondeds.iter() {
+        unbonded += unbond.amount
+    }
+    unbonded -= unbondings;
+    let reward_ratio: Decimal = Decimal::from_ratio(unbondings, bonded + unbonded);  
+    
+    Ok(unbondings + ((balance.amount - unbondings ) * reward_ratio * (Decimal::one() - config.commission_rate)))
 }

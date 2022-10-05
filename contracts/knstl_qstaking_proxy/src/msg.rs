@@ -15,9 +15,9 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Stake { validator: String },
     Unstake { validator: String, amount: Uint128 },
-    Claim {},
+    Claim {validator: String },
     Restake { from: String, to: String, amount: Uint128 },
-    Withdraw { validator: String },
+    Withdraw { },
     Compound { validator: String, amount: Uint128},
     Decompound { validator: String, amount: Uint128},
 }
@@ -27,5 +27,6 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     ConfigInfo {},
     Unbondings {},
+    Rewards {},
 }
 

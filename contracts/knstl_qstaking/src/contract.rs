@@ -72,10 +72,10 @@ pub fn execute(
         ExecuteMsg::Register {} => exec_register(deps, env, info),
         ExecuteMsg::Stake { validator } => exec_handle_stake(deps, env, info, validator),
         ExecuteMsg::Unstake { validator, amount } => exec_handle_unstake(deps, env, info, validator, amount),
-        ExecuteMsg::Claim {} => exec_handle_claim(deps, info),
+        ExecuteMsg::Claim {validator} => exec_handle_claim(deps, info, validator),
+        ExecuteMsg::ClaimAll {} => exec_handle_claim_all(deps, info),
         ExecuteMsg::Restake { from, to, amount } => exec_handle_redelegation(deps, info, from, to, amount),
-        ExecuteMsg::Withdraw { validator } => exec_handle_withdraw(deps, info, validator),
-        ExecuteMsg::WithdrawAll {} => exec_handle_withdraw_all(deps, info),
+        ExecuteMsg::Withdraw {} => exec_handle_withdraw(deps, info),
         ExecuteMsg::Compound { validator, amount } => exec_handle_compound(deps, env, info, validator, amount),
     }
 }
@@ -234,7 +234,7 @@ fn exec_handle_unstake(
     .add_attribute("to", &env.contract.address);
     Ok(res)
 }
-fn exec_handle_claim (
+fn exec_handle_withdraw (
     deps: DepsMut,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
@@ -246,7 +246,7 @@ fn exec_handle_claim (
     .add_message(CosmosMsg::Wasm({
         WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract, 
-            msg: to_binary(&ProxyExecuteMsg::Claim {})?, 
+            msg: to_binary(&ProxyExecuteMsg::Withdraw {})?, 
             funds: vec![],
     }}))
     .add_attribute("action", "claim")
@@ -300,7 +300,7 @@ fn exec_handle_redelegation (
     }));
     Ok(res)
 }
-fn exec_handle_withdraw(
+fn exec_handle_claim(
     deps: DepsMut, 
     info: MessageInfo,
     validator: String,
@@ -310,15 +310,16 @@ fn exec_handle_withdraw(
     let res = Response::new()
     .add_message(WasmMsg::Execute { 
         contract_addr: stake_info.stake_contract.clone(),
-        msg: to_binary(&ProxyExecuteMsg::Withdraw { validator })?, 
+        msg: to_binary(&ProxyExecuteMsg::Claim { validator: validator.clone() })?, 
         funds: vec![],
     })
-    .add_attribute("action", "withdraw_rewards")
-    .add_attribute("from", &info.sender)
+    .add_attribute("action", "claim_rewards")
+    .add_attribute("from", &validator)
+    .add_attribute("recipient", &info.sender)
     ;
     Ok(res)
 }
-fn exec_handle_withdraw_all(
+fn exec_handle_claim_all(
     deps: DepsMut, 
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
@@ -330,7 +331,7 @@ fn exec_handle_withdraw_all(
         if !staked.amount.is_zero() {
         withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract.clone(),
-            msg: to_binary(&ProxyExecuteMsg::Withdraw { validator: staked.validator })?, 
+            msg: to_binary(&ProxyExecuteMsg::Claim { validator: staked.validator })?, 
             funds: vec![],
     }}))}}
     

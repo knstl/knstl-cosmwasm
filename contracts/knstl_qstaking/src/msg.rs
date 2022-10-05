@@ -23,9 +23,9 @@ pub enum ExecuteMsg {
     Stake { validator: String },
     Unstake { validator: String, amount : Uint128 },
     Restake {from: String, to: String, amount: Uint128},
-    Claim {},
-    Withdraw {validator: String},
-    WithdrawAll {},
+    Claim {validator: String},
+    ClaimAll {},
+    Withdraw {},
     Compound {validator: String, amount: Uint128},
     // Decompound {validator: String, amount: Uint128},
 }
