@@ -91,12 +91,12 @@ Followings are executable commands :
   - Unstake `amount` from `validator`.
 - Restake { from: String, to: String, amount: Uint128 }
   - Change delegation amount of `amount` on `from` validator to `to` validator.
-- Claim { }
-  - Claim rewards. Errors out when no unbonded tokens.
-- Withdraw { validator: String }
-  - Withdraw rewards from `validator` to `proxy-contract`.
-- WithdrawAll { }
-  - Withdraw rewards from all validators user staked to `proxy-contract`.
+- Withdraw { }
+  - Withdraw rewards. Errors out when no unbonded tokens.
+- Collect { validator: String }
+  - Collect rewards from `validator` to `proxy-contract`.
+- CollectAll { }
+  - Collect rewards from all validators user staked to `proxy-contract`.
 - Compound { validator: String, amount: Uint128 }
   - Stake `amount` to `validator`, using `proxy-contract`'s balance.
   
@@ -116,9 +116,9 @@ REGISTER_MSG="{\"register\": {}}"
 STAKE_MSG="{\"stake\": {\"validator\": \"[validator-address]]\"}}" # for staking amount, use --amount flag
 UNSTAKE_MSG="{\"unstake\": {\"validator\": \"[validator-address]\", \"amount\": \"[amount-to-unstake]\"}}"
 RESTAKE_MSG="{\"restake\": {\"validator\": \"[validator-address]\"}}"
-CLAIM_MSG="{\"claim\": {}}"
-WITHDRAW_MSG="{\"withdraw\": {\"validator\": \"[validator-address]\"}}"
-WITHDRAWALL_MSG="{\"withdraw_all\": {}}"
+WIHDRAW_MSG="{\"withdraw\": {}}"
+COLLECT_MSG="{\"collect\": {\"validator\": \"[validator-address]\"}}"
+COLLECTALL_MSG="{\"collect_all\": {}}"
 COMPOUND_MSG="{\"compound\": {\"validator\": \"[validator-address]\", \"amount\": \"[amount-to-unstake]\"}}"
 ```
 
