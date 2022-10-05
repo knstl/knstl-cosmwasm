@@ -72,8 +72,8 @@ pub fn execute(
         ExecuteMsg::Register {} => exec_register(deps, env, info),
         ExecuteMsg::Stake { validator } => exec_handle_stake(deps, env, info, validator),
         ExecuteMsg::Unstake { validator, amount } => exec_handle_unstake(deps, env, info, validator, amount),
-        ExecuteMsg::Claim {validator} => exec_handle_claim(deps, info, validator),
-        ExecuteMsg::ClaimAll {} => exec_handle_claim_all(deps, info),
+        ExecuteMsg::Collect {validator} => exec_handle_collect(deps, info, validator),
+        ExecuteMsg::CollectAll {} => exec_handle_collect_all(deps, info),
         ExecuteMsg::Restake { from, to, amount } => exec_handle_redelegation(deps, info, from, to, amount),
         ExecuteMsg::Withdraw {} => exec_handle_withdraw(deps, info),
         ExecuteMsg::Compound { validator, amount } => exec_handle_compound(deps, env, info, validator, amount),
@@ -249,7 +249,7 @@ fn exec_handle_withdraw (
             msg: to_binary(&ProxyExecuteMsg::Withdraw {})?, 
             funds: vec![],
     }}))
-    .add_attribute("action", "claim")
+    .add_attribute("action", "withdraw")
     .add_attribute("from", &info.sender)
     ;
     Ok(res)
@@ -300,7 +300,7 @@ fn exec_handle_redelegation (
     }));
     Ok(res)
 }
-fn exec_handle_claim(
+fn exec_handle_collect(
     deps: DepsMut, 
     info: MessageInfo,
     validator: String,
@@ -310,16 +310,16 @@ fn exec_handle_claim(
     let res = Response::new()
     .add_message(WasmMsg::Execute { 
         contract_addr: stake_info.stake_contract.clone(),
-        msg: to_binary(&ProxyExecuteMsg::Claim { validator: validator.clone() })?, 
+        msg: to_binary(&ProxyExecuteMsg::Collect { validator: validator.clone() })?, 
         funds: vec![],
     })
-    .add_attribute("action", "claim_rewards")
+    .add_attribute("action", "collect_rewards")
     .add_attribute("from", &validator)
     .add_attribute("recipient", &info.sender)
     ;
     Ok(res)
 }
-fn exec_handle_claim_all(
+fn exec_handle_collect_all(
     deps: DepsMut, 
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
@@ -331,13 +331,13 @@ fn exec_handle_claim_all(
         if !staked.amount.is_zero() {
         withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
             contract_addr: stake_info.stake_contract.clone(),
-            msg: to_binary(&ProxyExecuteMsg::Claim { validator: staked.validator })?, 
+            msg: to_binary(&ProxyExecuteMsg::Collect { validator: staked.validator })?, 
             funds: vec![],
     }}))}}
     
     let res = Response::new()
     .add_messages(withdraw_msgs)
-    .add_attribute("action", "withdraw_rewards")
+    .add_attribute("action", "collect_rewards")
     .add_attribute("from", &info.sender)
     ;
     Ok(res)

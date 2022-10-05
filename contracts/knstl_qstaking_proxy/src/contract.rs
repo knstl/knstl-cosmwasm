@@ -41,7 +41,7 @@ pub fn execute(
         ExecuteMsg::Unstake { validator, amount } => exec_unstake(deps, env, info, validator, amount),
         ExecuteMsg::Withdraw {} => exec_withdraw(deps, env, info),
         ExecuteMsg::Restake {from, to, amount} => exec_restake(deps, env, info, from, to, amount),
-        ExecuteMsg::Claim {validator} => exec_claim(deps, info, validator),
+        ExecuteMsg::Collect {validator} => exec_collect(deps, info, validator),
         ExecuteMsg::Compound { validator, amount } => exec_compound(deps, info, validator, amount),
         ExecuteMsg::Decompound { validator, amount } => exec_decompound(deps, env, info, validator, amount),
     }
@@ -184,7 +184,7 @@ fn exec_withdraw(
     Ok(res)
 }
 
-fn exec_claim(
+fn exec_collect(
     deps: DepsMut,
     info: MessageInfo,
     validator: String,
@@ -198,7 +198,7 @@ fn exec_claim(
     .add_message(CosmosMsg::Distribution(
         DistributionMsg::WithdrawDelegatorReward { validator: validator.clone() }
     ))
-    .add_attribute("action", "claim")
+    .add_attribute("action", "collect")
     .add_attribute("from", &validator)
     .add_attribute("to", &info.sender);
     Ok(res)

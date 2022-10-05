@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Stake { validator: String },
     Unstake { validator: String, amount: Uint128 },
-    Claim {validator: String },
+    Collect {validator: String },
     Restake { from: String, to: String, amount: Uint128 },
     Withdraw { },
     Compound { validator: String, amount: Uint128},
