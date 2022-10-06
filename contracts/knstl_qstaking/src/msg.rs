@@ -13,7 +13,6 @@ pub struct InstantiateMsg {
     pub proxy_id: u64,
     pub proxy_label: String,
     pub commission_rate: Decimal,
-    pub community_pool: String,
     pub unbond_period: u64,
 }
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]

@@ -20,7 +20,6 @@ pub fn instantiate(
         denom: msg.denom,
         owner: msg.owner.clone(),
         unbond_period: msg.unbond_period,
-        community_pool : msg.community_pool,
         commission_rate: msg.commission_rate,
     })?;
     BONDED.save(deps.storage, &Uint128::zero())?;
@@ -123,6 +122,7 @@ fn exec_restake(
     to: String,
     amount: Uint128,
 )->Result<Response, ContractError> {
+
     let config = CONFIG.load(deps.storage)?;
     if info.sender != config.admin {
         return Err(ContractError::UnknownUser {})
@@ -173,9 +173,8 @@ fn exec_withdraw(
         amount: vec![total_unbond],
         to_address: config.owner.to_string(),
     })
-    .add_message(BankMsg::Send{
+    .add_message(BankMsg::Burn{
         amount: vec![commission],
-        to_address: config.community_pool,
     })
     .add_attribute("action", "withdraw")
     .add_attribute("from", &config.owner)
@@ -193,7 +192,7 @@ fn exec_collect(
     if info.sender != config.admin {
         return Err(ContractError::UnknownUser {})
     }
-
+    
     let res = Response::new()
     .add_message(CosmosMsg::Distribution(
         DistributionMsg::WithdrawDelegatorReward { validator: validator.clone() }
@@ -230,8 +229,7 @@ fn exec_compound (
                 denom: config.denom.clone(),
     }}))
     .add_message(CosmosMsg::Bank(
-        BankMsg::Send { 
-            to_address: config.community_pool, 
+        BankMsg::Burn { 
             amount: vec![Coin{
                 amount: amount * (config.commission_rate / (Decimal::one() - config.commission_rate)),
                 denom: config.denom 

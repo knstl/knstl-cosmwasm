@@ -27,7 +27,6 @@ pub fn instantiate(
         stake_contract_id : msg.proxy_id,
         stake_contract_label: msg.proxy_label,
         commission_rate: msg.commission_rate,
-        community_pool: msg.community_pool,
         unbond_period: msg.unbond_period,
     })?;
 
@@ -87,6 +86,8 @@ fn exec_register(
     let config = CONFIG.load(deps.storage)?;
 
     let res = Response::new()
+    .add_attribute("action", "register")
+    .add_attribute("user", &info.sender)
     .add_submessage(SubMsg { 
         id: STAKE_INIT_ID, 
         msg: CosmosMsg::Wasm(WasmMsg::Instantiate { 
@@ -96,7 +97,6 @@ fn exec_register(
                 denom: config.native_denom,
                 owner: info.sender,
                 commission_rate: config.commission_rate,
-                community_pool: config.community_pool,
                 unbond_period: config.unbond_period,
             })?, 
             funds: vec![], 

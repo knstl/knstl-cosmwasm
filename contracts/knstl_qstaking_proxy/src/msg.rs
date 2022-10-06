@@ -6,7 +6,6 @@ pub struct InstantiateMsg {
     pub denom : String,
     pub owner : Addr,
     pub unbond_period: u64,
-    pub community_pool: String,
     pub commission_rate: Decimal,
 }
 

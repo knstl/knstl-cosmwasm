@@ -11,7 +11,6 @@ pub struct Config {
     pub admin : Addr,
     pub denom : String,
     pub unbond_period: u64,
-    pub community_pool: String,
     pub commission_rate: Decimal,
 }
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]

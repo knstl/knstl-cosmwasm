@@ -10,7 +10,6 @@ pub struct Config {
     pub cw20contract : String,
     pub stake_contract_id : u64,
     pub stake_contract_label: String,
-    pub community_pool: String,
     pub commission_rate: Decimal,
     pub unbond_period: u64,
 }
