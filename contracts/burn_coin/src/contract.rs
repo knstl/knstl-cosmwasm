@@ -3,7 +3,7 @@ use cosmwasm_std::{entry_point, Env, DepsMut, MessageInfo, Response, BankMsg };
 use cw2::set_contract_version;
 use crate::msg::{InstantiateMsg, ExecuteMsg};
 use crate::ContractError;
-const CONTRACT_NAME: &str = "knstl_qstaking_proxy";
+const CONTRACT_NAME: &str = "burn_coin";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]

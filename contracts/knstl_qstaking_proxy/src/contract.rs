@@ -151,21 +151,21 @@ fn exec_withdraw(
     }
     let balance = deps.querier.query_balance(env.contract.address.clone(), config.denom.clone())?;
     let bonded = BONDED.load(deps.storage)?;
-    let unbondings = resolve_unbondings(deps.storage, env.clone())?;
-    let unbonded = get_unbonded_amount(deps.storage)?;
-    // let compounded_unbondings = resolve_compounded_unbondings(deps.storage, env)?;
-    if unbondings.is_zero() {
+    let unbondings = get_unbonded_amount(deps.storage)?;
+    let withdrawals = resolve_unbondings(deps.storage, env.clone())?;
+    if withdrawals.is_zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
     
-    let reward_ratio: Decimal = Decimal::from_ratio(unbondings, bonded + unbonded);  
+    let reward_ratio: Decimal = Decimal::from_ratio(withdrawals, bonded + unbondings);  
+    let reward = balance.amount - withdrawals;
     let total_unbond = Coin {
-        amount: unbondings + ((balance.amount - unbondings ) * reward_ratio * (Decimal::one() - config.commission_rate)),
+        amount: withdrawals + (reward * reward_ratio * (Decimal::one() - config.commission_rate)),
         denom: config.denom.clone(),
     };
 
     let commission = Coin {
-        amount : (balance.amount - unbondings ) * reward_ratio * config.commission_rate,
+        amount : reward * reward_ratio * config.commission_rate,
         denom: config.denom,
     };
     let res = Response::new()
@@ -355,7 +355,6 @@ fn query_rewards(deps: Deps, env: Env) -> StdResult<Uint128> {
     for unbond in unbondeds.iter() {
         unbonded += unbond.amount
     }
-    unbonded -= unbondings;
     let reward_ratio: Decimal = Decimal::from_ratio(unbondings, bonded + unbonded);  
     
     Ok(unbondings + ((balance.amount - unbondings ) * reward_ratio * (Decimal::one() - config.commission_rate)))
