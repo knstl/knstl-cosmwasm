@@ -115,8 +115,8 @@ JSON execution messages for this contract :
 REGISTER_MSG="{\"register\": {}}"
 STAKE_MSG="{\"stake\": {\"validator\": \"[validator-address]]\"}}" # for staking amount, use --amount flag
 UNSTAKE_MSG="{\"unstake\": {\"validator\": \"[validator-address]\", \"amount\": \"[amount-to-unstake]\"}}"
-RESTAKE_MSG="{\"restake\": {\"validator\": \"[validator-address]\"}}"
-WIHDRAW_MSG="{\"withdraw\": {}}"
+RESTAKE_MSG="{\"restake\": {\"from\": \"[src_val]\", \"to\": \"[dst_val]\", \"amount\": \"[amount-to-restake]\"}}"
+WITHDRAW_MSG="{\"withdraw\": {}}"
 COLLECT_MSG="{\"collect\": {\"validator\": \"[validator-address]\"}}"
 COLLECTALL_MSG="{\"collect_all\": {}}"
 COMPOUND_MSG="{\"compound\": {\"validator\": \"[validator-address]\", \"amount\": \"[amount-to-unstake]\"}}"
