@@ -446,8 +446,10 @@ pub fn query(
     }
 }
 fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<StakeInfo>{
-    let user_stake_info = STAKEINFO.load(deps.storage, &address)?;
-    Ok(user_stake_info)
+    match STAKEINFO.has(deps.storage, &address) {
+        true => { Ok(STAKEINFO.load(deps.storage, &address).unwrap() ) }
+        false => { Ok(StakeInfo { compounded: vec![], staked: vec![], stake_contract: String::new(), minted: Uint128::zero() })}
+    }
 }
 fn query_reward_token_amount(deps: Deps, address: Addr) -> StdResult<String> {
     let config = CONFIG.load(deps.storage)?;
