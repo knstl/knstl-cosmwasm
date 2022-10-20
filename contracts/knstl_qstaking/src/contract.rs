@@ -270,14 +270,6 @@ fn exec_handle_redelegation (
             return Err(ContractError::TooFewTokens {});
     }
 
-    if let None = stake_info.staked.iter().find(|x| x.validator == to) {
-        STAKEINFO.update(deps.storage, &info.sender, |info| -> StdResult<_> {
-            let mut ret = info.clone().unwrap();
-            ret.staked.push(Staked{ amount: Uint128::zero(), validator: to.clone()});
-            Ok(ret)
-        })?;
-    }
-    
     STAKEINFO.update(
         deps.storage, 
         &info.sender, 
@@ -285,9 +277,16 @@ fn exec_handle_redelegation (
             let mut ret = info.clone().unwrap();
             ret.staked.retain(|x| x.validator != from );
             ret.staked.push(Staked { amount: from_info.unwrap().amount.checked_sub(amount).unwrap(), validator: from.clone() });
-            let to_info = stake_info.staked.iter().find(|x| x.validator == to);
-            ret.staked.retain(|x| x.validator != to );
-            ret.staked.push(Staked { amount: to_info.unwrap().amount.checked_add(amount).unwrap(), validator: to.clone() });
+            match stake_info.staked.iter().find(|x| x.validator == to) {
+                Some(w) => {
+                    ret.staked.retain(|x| x.validator != to );
+                    ret.staked.push(Staked { amount: w.amount.checked_add(amount).unwrap(), validator: to.clone() });
+                }
+                None => {
+                    ret.staked.push(Staked { amount: amount, validator: to.clone() });
+                }
+            }
+        
             Ok(ret)
     })?;
 
