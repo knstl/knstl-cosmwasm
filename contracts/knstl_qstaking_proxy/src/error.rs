@@ -53,4 +53,7 @@ pub enum ContractError {
 
     #[error("Only Admin and Owner of this contract can execute")]
     UnknownUser {},
+
+    #[error("Cannot compound when unbonded tokens exist, unbond first")]
+    CompoundWithUnbondeds {},
 }

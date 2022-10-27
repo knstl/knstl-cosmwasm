@@ -215,6 +215,10 @@ fn exec_compound (
         return Err(ContractError::UnknownUser {})
     }
 
+    if UNBONDED.load(deps.storage)?.is_empty() {
+        return Err(ContractError::CompoundWithUnbondeds {  })
+    }
+    
     COMPOUNDED.update(deps.storage, |x| -> StdResult<Uint128> {
         Ok(x + amount)
     })?;
