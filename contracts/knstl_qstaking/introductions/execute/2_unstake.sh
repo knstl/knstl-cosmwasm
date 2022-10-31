@@ -7,6 +7,6 @@ UNSTAKE3_MSG="{\"unstake\": {\"validator\": \"$VAL_1\", \"amount\": \"333333\"}}
 #knstld tx wasm execute $QDARC $ALLOWANCE_MSG --from user1 -y --gas 10000000 --fees 60udarc
 #knstld tx wasm execute $QDARC $ALLOWANCE_MSG --from user2 -y --gas 10000000 --fees 60udarc
 sleep 6
-knstld tx wasm execute $DELEGATOR $UNSTAKE1_MSG --from user -y  --gas 10000000 --fees 60udarc 
+knstld tx wasm execute $DELEGATOR $UNSTAKE1_MSG --from park -y  --gas 10000000 --fees 60udarc 
 #knstld tx wasm execute $DELEGATOR $UNSTAKE2_MSG --from user1 -y --gas 10000000 --fees 60udarc 
 #knstld tx wasm execute $DELEGATOR $UNSTAKE3_MSG --from user2 -y --gas 10000000 --fees 60udarc 

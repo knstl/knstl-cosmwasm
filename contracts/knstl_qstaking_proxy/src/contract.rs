@@ -93,7 +93,7 @@ fn exec_unstake(
         return Err(ContractError::UnknownUser {})
     }
     UNBONDED.update(deps.storage, |mut x| -> StdResult<Vec<Unbonded>> {
-        x.push(Unbonded { amount: amount, date: env.block.time });
+        x.push(Unbonded { amount: amount, date: env.block.time, validator: validator });
         Ok(x)
     })?;
     BONDED.update(deps.storage, |x| -> StdResult<Uint128> {
@@ -262,7 +262,7 @@ fn exec_decompound (
         Ok(x - amount)
     })?;
     UNBONDED.update(deps.storage, |mut x| -> StdResult<Vec<Unbonded>> {
-        x.push(Unbonded { amount: amount, date: env.block.time });
+        x.push(Unbonded { amount: amount, date: env.block.time, validator: validator });
         Ok(x)
     })?;
     let res = Response::new()
@@ -291,7 +291,7 @@ fn resolve_unbondings(
         if env.block.time.seconds() - unbonded.date.seconds() >= config.unbond_period {
             ret += unbonded.amount;
         } 
-        else { new_unbonded.push(Unbonded { amount: unbonded.amount, date: unbonded.date }) }
+        else { new_unbonded.push(Unbonded { amount: unbonded.amount, date: unbonded.date, validator: unbonded.validator }) }
     }
     UNBONDED.update(storage, |_| -> StdResult<Vec<Unbonded>> {
         Ok(new_unbonded)

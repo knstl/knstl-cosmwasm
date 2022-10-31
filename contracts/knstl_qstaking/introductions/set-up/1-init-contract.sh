@@ -1,5 +1,5 @@
-QSTAKING_ID=7
-QSTAKING_PROXY_ID=6
+QSTAKING_ID=8
+QSTAKING_PROXY_ID=9
 CW20_ID=3
 INIT_MSG="{\"denom\" : \"udarc\", \"cw20_id\" : $CW20_ID, \"cw20_label\": \"crates.io:cw20-base\", \"token_name\": \"qdarc\", \"token_symbol\": \"qdarc\", \"proxy_id\": $QSTAKING_PROXY_ID, \"proxy_label\": \"knstl_qstaking_proxy\", \"commission_rate\": \"0.15\", \"unbond_period\": 120}"
 

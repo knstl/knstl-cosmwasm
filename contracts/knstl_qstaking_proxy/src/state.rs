@@ -17,6 +17,7 @@ pub struct Config {
 pub struct Unbonded {
     pub amount: Uint128,
     pub date: Timestamp,
+    pub validator: String,
 }
 
 pub const CONFIG : Item<Config> = Item::new("config");
