@@ -291,7 +291,7 @@ fn resolve_unbondings(
         if env.block.time.seconds() - unbonded.date.seconds() >= config.unbond_period {
             ret += unbonded.amount;
         } 
-        else { new_unbonded.push(Unbonded { amount: unbonded.amount, date: unbonded.clone().date, validator: unbonded.validator }) }
+        else { new_unbonded.push(Unbonded { amount: unbonded.amount, date: unbonded.date, validator: unbonded.validator.clone() }) }
     }
     UNBONDED.update(storage, |_| -> StdResult<Vec<Unbonded>> {
         Ok(new_unbonded)
