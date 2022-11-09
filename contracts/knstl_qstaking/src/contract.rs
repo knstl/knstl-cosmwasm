@@ -426,6 +426,7 @@ pub fn query(
         QueryMsg::ConfigInfo {} => to_binary(&query_config(deps)?),
         QueryMsg::Staked { address } => to_binary(&query_stake_amount(deps, address)?),
         QueryMsg::TokenInfo { address } => to_binary(&query_reward_token_amount(deps, address)?),
+        QueryMsg::ProxyAddress { address } => to_binary(&query_proxy_address(deps, address)?),
     }
 }
 fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<Vec<QueryStaked>>{
@@ -454,4 +455,11 @@ fn query_config(deps: Deps) -> StdResult<Config> {
 }
 fn query_account_info(deps: Deps, address: Addr) -> StdResult<bool> {
     Ok(PROXY.has(deps.storage, &address))
+}
+fn query_proxy_address(deps: Deps, address: Addr) -> StdResult<String> {
+    if PROXY.has(deps.storage, &address) {
+        Ok(PROXY.load(deps.storage, &address)?)
+    } else {
+        Ok(String::new())
+    }
 }

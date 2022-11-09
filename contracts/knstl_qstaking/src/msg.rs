@@ -35,6 +35,7 @@ pub enum QueryMsg {
     AccountInfo {address: Addr},
     Staked {address: Addr},
     TokenInfo {address: Addr},
+    ProxyAddress {address: Addr},
 }
 
 
