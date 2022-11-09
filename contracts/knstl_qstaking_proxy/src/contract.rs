@@ -39,8 +39,8 @@ pub fn execute(
         ExecuteMsg::Stake { validator } => exec_stake(deps, env, info, validator),
         ExecuteMsg::Unstake { validator, amount } => exec_unstake(deps, env, info, validator, amount),
         ExecuteMsg::Withdraw {} => exec_withdraw(deps, env, info),
-        ExecuteMsg::Restake {from, to, amount} => exec_restake(deps, env, info, from, to, amount),
-        ExecuteMsg::Collect {validator} => exec_collect(deps, info, validator),
+        ExecuteMsg::Restake { from, to, amount} => exec_restake(deps, env, info, from, to, amount),
+        ExecuteMsg::Collect { validator} => exec_collect(deps, info, validator),
         ExecuteMsg::Compound { validator, amount } => exec_compound(deps, info, validator, amount),
         ExecuteMsg::Decompound { validator, amount } => exec_decompound(deps, env, info, validator, amount),
     }
@@ -168,13 +168,18 @@ fn exec_withdraw(
         amount : reward * reward_ratio * config.commission_rate,
         denom: config.denom,
     };
-    let res = Response::new()
+    let res = 
+    if commission.amount == Uint128::zero() {
+        Response::new()
+    } else {
+        Response::new()
+        .add_message(BankMsg::Burn{
+            amount: vec![commission],
+        })
+    }
     .add_message(BankMsg::Send{
         amount: vec![total_unbond],
         to_address: config.owner.to_string(),
-    })
-    .add_message(BankMsg::Burn{
-        amount: vec![commission],
     })
     .add_attribute("action", "withdraw")
     .add_attribute("from", &config.owner)
@@ -283,7 +288,6 @@ fn resolve_unbondings(
     storage: &mut dyn Storage,
     env: Env,
 )-> StdResult<Uint128> {
-    let config = CONFIG.load(storage)?;
     let unbondeds = UNBONDED.load(storage)?;
     let mut ret = Uint128::zero();
     let mut new_unbonded : Vec<Unbonded> = vec![];
@@ -308,22 +312,6 @@ fn get_unbonded_amount(
     }
     Ok(ret)
 }
-// fn resolve_compounded_unbondings(
-//     storage: &mut dyn Storage,
-//     env: Env,
-// )-> StdResult<Uint128> {
-//     let config = CONFIG.load(storage)?;
-//     let mut ret = Uint128::zero();
-//     let mut new_unbonded : Vec<Unbonded> = vec![];
-//     for unbonded in unbondeds.iter() {
-//         if env.block.time.seconds() - unbonded.date.seconds() >= config.unbond_period {
-//             ret += unbonded.amount;
-//         } 
-//         else { new_unbonded.push(Unbonded { amount: unbonded.amount, date: unbonded.date }) }
-//     }
-//     Ok(ret)
-// }
-
 
 #[entry_point]
 pub fn query(

@@ -13,25 +13,13 @@ pub struct Config {
     pub commission_rate: Decimal,
     pub unbond_period: u64,
 }
+
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
-pub struct StakeInfo {
-    pub compounded: Vec<Staked>,
-    pub staked : Vec<Staked>,
-    pub stake_contract : String,
-    pub minted : Uint128,
+pub struct Stakes {
+    pub compounded: Uint128,
+    pub staked : Uint128,
 }
-
-impl StakeInfo{
-    pub fn new() -> Self {
-        StakeInfo { compounded: vec![], staked: vec![], stake_contract: String::new(), minted: Uint128::zero() }
-    }
-}
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq,  )]
-pub struct Staked {
-    pub amount: Uint128,
-    pub validator: String,
-
-}
-
-pub const STAKEINFO : Map<&Addr, StakeInfo> = Map::new("stakeinfo");
 pub const CONFIG : Item<Config> = Item::new("delegateinfo");
+
+pub const STAKES : Map<(&Addr, String), Stakes> = Map::new("stakes");
+pub const PROXY : Map<&Addr, String> = Map::new("proxyaddr");

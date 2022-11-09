@@ -1,13 +1,14 @@
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::{to_binary, entry_point, Env, Deps, DepsMut, MessageInfo, Response, StdResult, Binary, Uint128, CosmosMsg, WasmMsg, Addr, SubMsg, ReplyOn, Reply, Decimal};
 use cw2::set_contract_version;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20InstantiateMsg, MinterResponse};
-use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
+use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg, QueryStaked};
 use crate::error::ContractError;
-use crate::state::{STAKEINFO, StakeInfo, Config, CONFIG, Staked};
+use crate::state::{Config, CONFIG, PROXY, STAKES, Stakes};
 use qstaking_proxy::msg::{InstantiateMsg as ProxyInstantiateMsg, ExecuteMsg as ProxyExecuteMsg};
 
-const CONTRACT_NAME: &str = "knstl_qstaking";
+const CONTRACT_NAME: &str = "knstl_qstaking_dev";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOKEN_INIT_ID : u64 = 1;
 const STAKE_INIT_ID : u64 = 2;
@@ -115,9 +116,9 @@ fn exec_handle_stake(
     env: Env,
     info: MessageInfo,
     validator: String,
-)->Result<Response, ContractError> {
+)-> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
     if info.funds.len() > 1 {
         return Err(ContractError::InvalidMultipleTokens {})
     }
@@ -126,31 +127,24 @@ fn exec_handle_stake(
         return Err(ContractError::UnstakeableTokenSent { denom: received.denom.clone() });
     }
     
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    let staked = stake_info.staked.iter().find(|x| x.validator == validator);
-
-    STAKEINFO.update(deps.storage, &info.sender, |info| -> StdResult<_> {
-        let mut ret = info.clone().unwrap();
-        ret.minted += received.amount;
-        match staked {
-            Some(w) => {
-                ret.staked.retain(|x| x.validator != validator);
-                ret.staked.push(Staked{
-                    amount: w.amount + received.amount,
-                    validator: validator.clone(),
-                });
-            },
-            None => {
-                ret.staked.push(Staked { amount: received.amount, validator: validator.clone()});
-            },
-        }
-        Ok(ret)
-    })?;
-
+    match STAKES.may_load(deps.storage, (&info.sender, validator.clone()))? {
+        Some(w) => {
+            STAKES.save(deps.storage, (&info.sender, validator.clone()), &Stakes {
+                compounded: w.compounded,
+                staked: w.staked + received.amount,
+            })?;
+        },
+        None => {            
+            STAKES.save(deps.storage, (&info.sender, validator.clone()), &Stakes {
+                compounded: Uint128::zero(),
+                staked: received.amount,
+            })?;
+        },
+    }
     let res = Response::new()
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract, 
+            contract_addr: proxy, 
             msg: to_binary(&ProxyExecuteMsg::Stake { validator: validator.clone() })?, 
             funds: info.funds.clone(), 
     }))
@@ -178,66 +172,43 @@ fn exec_handle_unstake(
     amount: Uint128,
 )->Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    let staked = stake_info.staked.iter().find(|x| x.validator == validator).unwrap();
-    let compounded = stake_info.compounded.iter().find(|x| x.validator == validator);
-    if amount > staked.amount {
+    let stakes = STAKES.load(deps.storage, (&info.sender, validator.clone()))?;
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
+    if amount > stakes.staked {
         return Err(ContractError::InvalidUnstakeAmount {});
     }
-    let redeem_rate = Decimal::from_ratio(amount, staked.amount);
+    let redeem_rate = Decimal::from_ratio(amount, stakes.staked);
     let res = 
-    match compounded {
-        Some(w) => {
-            if !w.amount.is_zero() {    
-                let decompound_amount = w.amount * redeem_rate;
-                STAKEINFO.update(
-                        deps.storage, 
-                        &info.sender, 
-                        |info| -> StdResult<_> {
-                            let mut ret = info.clone().unwrap();
-                            ret.staked.retain(|x| x.validator != validator );
-                            ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
-                            ret.minted -= amount;
-                            ret.compounded.retain(|x| x.validator != validator);
-                            ret.compounded.push(Staked {amount: w.amount.checked_sub(decompound_amount).unwrap(), validator: validator.clone() });
-                            Ok(ret)
-                })?;
-                Response::new()
-                .add_message(WasmMsg::Execute { 
-                    contract_addr: stake_info.stake_contract.clone(), 
-                    msg: to_binary(&ProxyExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
-                    funds: vec![],
-                })      
-            } else {
-                STAKEINFO.update(
-                    deps.storage, 
-                    &info.sender, 
-                    |info| -> StdResult<_> {
-                        let mut ret = info.clone().unwrap();
-                        ret.staked.retain(|x| x.validator != validator );
-                        ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
-                        ret.minted -= amount;
-                        Ok(ret)
-                })?;
-                Response::new()
+    if stakes.compounded == Uint128::zero() {
+        STAKES.update(
+            deps.storage, (&info.sender, validator.clone()),
+            |x| -> StdResult<_> {
+                let mut ret = x.unwrap();
+                ret.staked = ret.staked.checked_sub(amount).unwrap();
+                Ok(ret)
             }
-        },
-        None => {
-            STAKEINFO.update(
-                    deps.storage, 
-                    &info.sender, 
-                    |info| -> StdResult<_> {
-                        let mut ret = info.clone().unwrap();
-                        ret.staked.retain(|x| x.validator != validator );
-                        ret.staked.push(Staked { amount: staked.amount.checked_sub(amount).unwrap(), validator: validator.clone() });
-                        ret.minted -= amount;
-                        Ok(ret)
-            })?;
-            Response::new()
-        },
+        )?;
+        Response::new()
+    } else {
+        let decompound_amount = stakes.compounded * redeem_rate;
+        STAKES.update(
+            deps.storage, (&info.sender, validator.clone()),
+            |x| -> StdResult<_> {
+                let mut ret = x.unwrap();
+                ret.staked = ret.staked.checked_sub(amount).unwrap();
+                ret.compounded = ret.compounded.checked_sub(decompound_amount).unwrap();
+                Ok(ret)
+            }
+        )?;
+        Response::new()                
+        .add_message(WasmMsg::Execute { 
+            contract_addr: proxy.clone(),
+            msg: to_binary(&ProxyExecuteMsg::Decompound { amount: decompound_amount, validator: validator.to_string() })?,
+            funds: vec![],
+        })      
     }            
     .add_message(WasmMsg::Execute { 
-        contract_addr: stake_info.stake_contract.clone(), 
+        contract_addr: proxy, 
         msg: to_binary(&ProxyExecuteMsg::Unstake { amount, validator })?,
         funds: vec![],
     })
@@ -257,12 +228,12 @@ fn exec_handle_withdraw(
     deps: DepsMut,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
+
     let res = Response::new()
     .add_message(CosmosMsg::Wasm({
         WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract, 
+            contract_addr: proxy,
             msg: to_binary(&ProxyExecuteMsg::Withdraw {})?, 
             funds: vec![],
         }
@@ -280,37 +251,36 @@ fn exec_handle_redelegation(
     to: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> { 
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    let from_info = stake_info.staked.iter().find(|x| x.validator == from);
-
-    if from_info == None {
-        return Err(ContractError::InvalidRequest {});
-    } else if from_info.unwrap().amount < amount {
+    let from_stakes = STAKES.load(deps.storage, (&info.sender, from.clone()))?;
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
+    if from_stakes.staked < amount {
             return Err(ContractError::NotEnoughTokens {});
     }
-    STAKEINFO.update(
-        deps.storage, 
-        &info.sender, 
-        |info| -> StdResult<_> {
-            let mut ret = info.clone().unwrap();
-            ret.staked.retain(|x| x.validator != from );
-            ret.staked.push(Staked { amount: from_info.unwrap().amount.checked_sub(amount).unwrap(), validator: from.clone() });
-            match stake_info.staked.iter().find(|x| x.validator == to) {
-                Some(w) => {
-                    ret.staked.retain(|x| x.validator != to );
-                    ret.staked.push(Staked { amount: w.amount.checked_add(amount).unwrap(), validator: to.clone() });
-                }
-                None => {
-                    ret.staked.push(Staked { amount, validator: to.clone() });
-                }
-            }
-            Ok(ret)
+    STAKES.update(deps.storage, (&info.sender, from.clone()), |x| -> StdResult<_> {
+        let mut ret = x.unwrap();
+        ret.staked = ret.staked.checked_sub(amount).unwrap();
+        Ok(ret)
     })?;
+    match STAKES.has(deps.storage, (&info.sender, to.clone())) {
+        true => {
+            STAKES.update(deps.storage, (&info.sender, to.clone()), |x| -> StdResult<_> {
+            let mut ret = x.unwrap();
+            ret.staked = ret.staked.checked_sub(amount).unwrap();
+            Ok(ret)
+        })?;
+        },
+        false => {
+            STAKES.save(deps.storage, (&info.sender, to.clone()), &Stakes { 
+                compounded: Uint128::zero(), 
+                staked: amount,
+            })?;
+        },
+    }
 
     let res = Response::new()
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract, 
+            contract_addr: proxy,
             msg: to_binary(&ProxyExecuteMsg::Restake { from, to, amount })?,
             funds: vec![],
     }))
@@ -323,11 +293,11 @@ fn exec_handle_collect(
     info: MessageInfo,
     validator: String,
 ) -> Result<Response, ContractError> {
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
 
     let res = Response::new()
     .add_message(WasmMsg::Execute { 
-        contract_addr: stake_info.stake_contract.clone(),
+        contract_addr: proxy,
         msg: to_binary(&ProxyExecuteMsg::Collect { validator: validator.clone() })?, 
         funds: vec![],
     })
@@ -342,17 +312,21 @@ fn exec_handle_collect_all(
     deps: DepsMut, 
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
+    
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
     let mut withdraw_msgs: Vec<CosmosMsg> = vec![];
 
-    for staked in stake_info.staked.clone() {
-        if !staked.amount.is_zero() {
+    let keys = STAKES
+        .keys(deps.storage, None, None, cosmwasm_std::Order::Ascending);
+    
+    for key in keys {
+        let v = key.unwrap().1;
+        if !STAKES.load(deps.storage, (&info.sender, v.clone()))?.staked.is_zero() {
         withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract.clone(),
-            msg: to_binary(&ProxyExecuteMsg::Collect { validator: staked.validator })?, 
+            contract_addr: proxy.clone(),
+            msg: to_binary(&ProxyExecuteMsg::Collect { validator: v.clone() })?, 
             funds: vec![],
-            }}))
-        }
+        }}))}
     }
     
     let res = Response::new()
@@ -370,33 +344,18 @@ fn exec_handle_compound(
     validator: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let stake_info = STAKEINFO.load(deps.storage, &info.sender)?;
-    if let None = stake_info.staked.iter().find(|x| x.validator == validator) {
-        return Err(ContractError::InvalidCompound {})
-    }
-    let compounded = stake_info.compounded.iter().find(|x| x.validator == validator);
+    let proxy = PROXY.load(deps.storage, &info.sender)?;
 
-    STAKEINFO.update(deps.storage, &info.sender, |info| -> StdResult<_> {
-        let mut ret = info.clone().unwrap();
-        match compounded {
-            Some(w) => {
-                ret.compounded.retain(|x| x.validator != validator);
-                ret.compounded.push( Staked{
-                    amount: w.amount + amount,
-                    validator: validator.clone(),
-                });
-            },
-            None => {
-                ret.compounded.push(Staked { amount, validator: validator.clone()});
-            },
-        }
+    STAKES.update(deps.storage, (&info.sender, validator.clone()), |x| -> StdResult<_> {
+        let mut ret = x.unwrap();
+        ret.compounded += amount;
         Ok(ret)
     })?;
 
     let res = Response::new()
     .add_message(CosmosMsg::Wasm(
         WasmMsg::Execute { 
-            contract_addr: stake_info.stake_contract, 
+            contract_addr: proxy,
             msg: to_binary(&ProxyExecuteMsg::Compound { validator: validator.clone(), amount })?, 
             funds: info.funds.clone(), 
     }))
@@ -448,12 +407,10 @@ fn handle_stake_init(
         return Err(ContractError::InvalidSubmsg {});
     }
     
-    STAKEINFO.save(deps.storage, &deps.api.addr_validate(&owner).unwrap(), &StakeInfo { 
-        staked: vec![],
-        compounded: vec![],
-        stake_contract: cw_utils::parse_reply_instantiate_data(msg).unwrap().contract_address,
-        minted: Uint128::zero(),
-    })?;
+    PROXY.save(deps.storage, 
+        &deps.api.addr_validate(&owner).unwrap(), 
+        &cw_utils::parse_reply_instantiate_data(msg).unwrap().contract_address
+    )?;
     Ok(Response::default())
 }
 
@@ -471,11 +428,18 @@ pub fn query(
         QueryMsg::TokenInfo { address } => to_binary(&query_reward_token_amount(deps, address)?),
     }
 }
-fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<StakeInfo>{
-    match STAKEINFO.has(deps.storage, &address) {
-        true => { Ok(STAKEINFO.load(deps.storage, &address).unwrap() ) }
-        false => { Ok(StakeInfo::new())}
+fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<Vec<QueryStaked>>{
+    let iter  = STAKES.prefix(&address).range(deps.storage, None, None, cosmwasm_std::Order::Ascending).into_iter();
+    let mut ret = vec![];
+    for item in iter {
+        let x = item.unwrap();
+        ret.push(QueryStaked {  
+            validator: x.0,
+            staked: x.1.staked, 
+            compounded: x.1.compounded,
+        });
     }
+    Ok(ret)
 }
 fn query_reward_token_amount(deps: Deps, address: Addr) -> StdResult<String> {
     let config = CONFIG.load(deps.storage)?;
@@ -489,5 +453,5 @@ fn query_config(deps: Deps) -> StdResult<Config> {
     Ok(config)
 }
 fn query_account_info(deps: Deps, address: Addr) -> StdResult<bool> {
-    Ok(STAKEINFO.has(deps.storage, &address))
+    Ok(PROXY.has(deps.storage, &address))
 }

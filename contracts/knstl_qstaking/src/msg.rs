@@ -37,3 +37,10 @@ pub enum QueryMsg {
     TokenInfo {address: Addr},
 }
 
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
+pub struct QueryStaked {
+    pub validator: String,
+    pub staked: Uint128,
+    pub compounded: Uint128,
+}
