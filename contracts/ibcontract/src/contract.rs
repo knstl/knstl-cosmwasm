@@ -1,5 +1,5 @@
 #[cfg(not(feature = "library"))]
-use cosmwasm_std::{entry_point, Env, DepsMut, MessageInfo, Response, BankMsg, IB };
+use cosmwasm_std::{entry_point, Env, DepsMut, MessageInfo, Response, BankMsg };
 use cw2::set_contract_version;
 use crate::msg::{InstantiateMsg, ExecuteMsg};
 use crate::ContractError;
