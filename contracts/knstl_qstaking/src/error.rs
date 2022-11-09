@@ -61,5 +61,8 @@ pub enum ContractError {
     InvalidUnstake {},
 
     #[error("Tokens are too few to execute")]
-    TooFewTokens {},
+    NotEnoughTokens {},
+
+    #[error("Cannot compound to validator with no bonded tokens")]
+    InvalidCompound {},
 }

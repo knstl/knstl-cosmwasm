@@ -20,6 +20,12 @@ pub struct StakeInfo {
     pub stake_contract : String,
     pub minted : Uint128,
 }
+
+impl StakeInfo{
+    pub fn new() -> Self {
+        StakeInfo { compounded: vec![], staked: vec![], stake_contract: String::new(), minted: Uint128::zero() }
+    }
+}
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq,  )]
 pub struct Staked {
     pub amount: Uint128,

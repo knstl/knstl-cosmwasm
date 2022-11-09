@@ -93,7 +93,7 @@ fn exec_unstake(
         return Err(ContractError::UnknownUser {})
     }
     UNBONDED.update(deps.storage, |mut x| -> StdResult<Vec<Unbonded>> {
-        x.push(Unbonded { amount: amount, date: env.block.time, validator: validator.clone() });
+        x.push(Unbonded { amount: amount, complete_date: env.block.time.plus_seconds(config.unbond_period), validator: validator.clone() });
         Ok(x)
     })?;
     BONDED.update(deps.storage, |x| -> StdResult<Uint128> {
@@ -215,7 +215,7 @@ fn exec_compound (
         return Err(ContractError::UnknownUser {})
     }
 
-    if UNBONDED.load(deps.storage)?.is_empty() {
+    if !UNBONDED.load(deps.storage)?.is_empty() {
         return Err(ContractError::CompoundWithUnbondeds {  })
     }
     
@@ -262,7 +262,7 @@ fn exec_decompound (
         Ok(x - amount)
     })?;
     UNBONDED.update(deps.storage, |mut x| -> StdResult<Vec<Unbonded>> {
-        x.push(Unbonded { amount: amount, date: env.block.time, validator: validator.clone() });
+        x.push(Unbonded { amount: amount, complete_date: env.block.time.plus_seconds(config.unbond_period), validator: validator.clone() });
         Ok(x)
     })?;
     let res = Response::new()
@@ -288,10 +288,10 @@ fn resolve_unbondings(
     let mut ret = Uint128::zero();
     let mut new_unbonded : Vec<Unbonded> = vec![];
     for unbonded in unbondeds.iter() {
-        if env.block.time.seconds() - unbonded.date.seconds() >= config.unbond_period {
+        if env.block.time.seconds() >= unbonded.complete_date.seconds() {
             ret += unbonded.amount;
         } 
-        else { new_unbonded.push(Unbonded { amount: unbonded.amount, date: unbonded.date, validator: unbonded.validator.clone() }) }
+        else { new_unbonded.push(Unbonded { amount: unbonded.amount, complete_date: unbonded.complete_date, validator: unbonded.validator.clone() }) }
     }
     UNBONDED.update(storage, |_| -> StdResult<Vec<Unbonded>> {
         Ok(new_unbonded)
@@ -351,13 +351,17 @@ fn query_rewards(deps: Deps, env: Env) -> StdResult<Uint128> {
     let mut unbondings = Uint128::zero();
     let unbondeds = UNBONDED.load(deps.storage)?;
     for unbonded in unbondeds.iter() {
-        if env.block.time.seconds() - unbonded.date.seconds() >= config.unbond_period {
+        if env.block.time.seconds() >= unbonded.complete_date.seconds() {
             unbondings += unbonded.amount;
         } 
     }
     let mut unbonded = Uint128::zero();
     for unbond in unbondeds.iter() {
         unbonded += unbond.amount
+    }
+
+    if bonded.is_zero() && unbonded.is_zero() {
+        return Ok(Uint128::zero())
     }
     let reward_ratio: Decimal = Decimal::from_ratio(unbondings, bonded + unbonded);  
     

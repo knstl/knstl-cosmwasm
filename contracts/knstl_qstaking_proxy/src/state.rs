@@ -16,7 +16,7 @@ pub struct Config {
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
 pub struct Unbonded {
     pub amount: Uint128,
-    pub date: Timestamp,
+    pub complete_date: Timestamp,
     pub validator: String,
 }
 
