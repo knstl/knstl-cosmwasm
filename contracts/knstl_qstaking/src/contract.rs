@@ -5,10 +5,10 @@ use cw2::set_contract_version;
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20InstantiateMsg, MinterResponse};
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg, QueryStaked};
 use crate::error::ContractError;
-use crate::state::{Config, CONFIG, PROXY, STAKES, Stakes};
+use crate::state::{Config, CONFIG, PROXY, STAKEINFO, StakeInfo};
 use qstaking_proxy::msg::{InstantiateMsg as ProxyInstantiateMsg, ExecuteMsg as ProxyExecuteMsg};
 
-const CONTRACT_NAME: &str = "knstl_qstaking_dev";
+const CONTRACT_NAME: &str = "knstl_qstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOKEN_INIT_ID : u64 = 1;
 const STAKE_INIT_ID : u64 = 2;
@@ -127,15 +127,15 @@ fn exec_handle_stake(
         return Err(ContractError::UnstakeableTokenSent { denom: received.denom.clone() });
     }
     
-    match STAKES.may_load(deps.storage, (&info.sender, validator.clone()))? {
+    match STAKEINFO.may_load(deps.storage, (&info.sender, validator.clone()))? {
         Some(w) => {
-            STAKES.save(deps.storage, (&info.sender, validator.clone()), &Stakes {
+            STAKEINFO.save(deps.storage, (&info.sender, validator.clone()), &StakeInfo {
                 compounded: w.compounded,
                 staked: w.staked + received.amount,
             })?;
         },
         None => {            
-            STAKES.save(deps.storage, (&info.sender, validator.clone()), &Stakes {
+            STAKEINFO.save(deps.storage, (&info.sender, validator.clone()), &StakeInfo {
                 compounded: Uint128::zero(),
                 staked: received.amount,
             })?;
@@ -172,15 +172,15 @@ fn exec_handle_unstake(
     amount: Uint128,
 )->Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let stakes = STAKES.load(deps.storage, (&info.sender, validator.clone()))?;
+    let stake_info = STAKEINFO.load(deps.storage, (&info.sender, validator.clone()))?;
     let proxy = PROXY.load(deps.storage, &info.sender)?;
-    if amount > stakes.staked {
+    if amount > stake_info.staked {
         return Err(ContractError::InvalidUnstakeAmount {});
     }
-    let redeem_rate = Decimal::from_ratio(amount, stakes.staked);
+    let redeem_rate = Decimal::from_ratio(amount, stake_info.staked);
     let res = 
-    if stakes.compounded == Uint128::zero() {
-        STAKES.update(
+    if stake_info.compounded == Uint128::zero() {
+        STAKEINFO.update(
             deps.storage, (&info.sender, validator.clone()),
             |x| -> StdResult<_> {
                 let mut ret = x.unwrap();
@@ -190,8 +190,8 @@ fn exec_handle_unstake(
         )?;
         Response::new()
     } else {
-        let decompound_amount = stakes.compounded * redeem_rate;
-        STAKES.update(
+        let decompound_amount = stake_info.compounded * redeem_rate;
+        STAKEINFO.update(
             deps.storage, (&info.sender, validator.clone()),
             |x| -> StdResult<_> {
                 let mut ret = x.unwrap();
@@ -251,26 +251,26 @@ fn exec_handle_redelegation(
     to: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> { 
-    let from_stakes = STAKES.load(deps.storage, (&info.sender, from.clone()))?;
+    let from_stake_info = STAKEINFO.load(deps.storage, (&info.sender, from.clone()))?;
     let proxy = PROXY.load(deps.storage, &info.sender)?;
-    if from_stakes.staked < amount {
+    if from_stake_info.staked < amount {
             return Err(ContractError::NotEnoughTokens {});
     }
-    STAKES.update(deps.storage, (&info.sender, from.clone()), |x| -> StdResult<_> {
+    STAKEINFO.update(deps.storage, (&info.sender, from.clone()), |x| -> StdResult<_> {
         let mut ret = x.unwrap();
         ret.staked = ret.staked.checked_sub(amount).unwrap();
         Ok(ret)
     })?;
-    match STAKES.has(deps.storage, (&info.sender, to.clone())) {
+    match STAKEINFO.has(deps.storage, (&info.sender, to.clone())) {
         true => {
-            STAKES.update(deps.storage, (&info.sender, to.clone()), |x| -> StdResult<_> {
+            STAKEINFO.update(deps.storage, (&info.sender, to.clone()), |x| -> StdResult<_> {
             let mut ret = x.unwrap();
             ret.staked = ret.staked.checked_sub(amount).unwrap();
             Ok(ret)
         })?;
         },
         false => {
-            STAKES.save(deps.storage, (&info.sender, to.clone()), &Stakes { 
+            STAKEINFO.save(deps.storage, (&info.sender, to.clone()), &StakeInfo { 
                 compounded: Uint128::zero(), 
                 staked: amount,
             })?;
@@ -316,12 +316,12 @@ fn exec_handle_collect_all(
     let proxy = PROXY.load(deps.storage, &info.sender)?;
     let mut withdraw_msgs: Vec<CosmosMsg> = vec![];
 
-    let keys = STAKES
+    let keys = STAKEINFO
         .keys(deps.storage, None, None, cosmwasm_std::Order::Ascending);
     
     for key in keys {
         let v = key.unwrap().1;
-        if !STAKES.load(deps.storage, (&info.sender, v.clone()))?.staked.is_zero() {
+        if !STAKEINFO.load(deps.storage, (&info.sender, v.clone()))?.staked.is_zero() {
         withdraw_msgs.push(CosmosMsg::Wasm({WasmMsg::Execute { 
             contract_addr: proxy.clone(),
             msg: to_binary(&ProxyExecuteMsg::Collect { validator: v.clone() })?, 
@@ -346,7 +346,7 @@ fn exec_handle_compound(
 ) -> Result<Response, ContractError> {
     let proxy = PROXY.load(deps.storage, &info.sender)?;
 
-    STAKES.update(deps.storage, (&info.sender, validator.clone()), |x| -> StdResult<_> {
+    STAKEINFO.update(deps.storage, (&info.sender, validator.clone()), |x| -> StdResult<_> {
         let mut ret = x.unwrap();
         ret.compounded += amount;
         Ok(ret)
@@ -429,7 +429,7 @@ pub fn query(
     }
 }
 fn query_stake_amount(deps: Deps, address: Addr)-> StdResult<Vec<QueryStaked>>{
-    let iter  = STAKES.prefix(&address).range(deps.storage, None, None, cosmwasm_std::Order::Ascending).into_iter();
+    let iter  = STAKEINFO.prefix(&address).range(deps.storage, None, None, cosmwasm_std::Order::Ascending).into_iter();
     let mut ret = vec![];
     for item in iter {
         let x = item.unwrap();

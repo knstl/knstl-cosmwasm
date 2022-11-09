@@ -15,11 +15,11 @@ pub struct Config {
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
-pub struct Stakes {
+pub struct StakeInfo {
     pub compounded: Uint128,
     pub staked : Uint128,
 }
 pub const CONFIG : Item<Config> = Item::new("delegateinfo");
 
-pub const STAKES : Map<(&Addr, String), Stakes> = Map::new("stakes");
+pub const STAKEINFO : Map<(&Addr, String), StakeInfo> = Map::new("stakeinfo");
 pub const PROXY : Map<&Addr, String> = Map::new("proxyaddr");
