@@ -4,6 +4,7 @@ use cw2::set_contract_version;
 use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg};
 use crate::error::ContractError;
 use crate::state::{CONFIG, Config, UNBONDED, Unbonded, BONDED, COMPOUNDED};
+
 const CONTRACT_NAME: &str = "knstl_qstaking_proxy";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 

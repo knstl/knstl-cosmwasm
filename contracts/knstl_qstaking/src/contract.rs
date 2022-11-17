@@ -131,7 +131,7 @@ fn exec_handle_stake(
         Some(w) => {
             STAKEINFO.save(deps.storage, (&info.sender, validator.clone()), &StakeInfo {
                 compounded: w.compounded,
-                staked: w.staked + received.amount,
+                staked: w.staked + received.amount, // to checked_add / normal
             })?;
         },
         None => {            
@@ -172,7 +172,7 @@ fn exec_handle_unstake(
     amount: Uint128,
 )->Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let stake_info = STAKEINFO.load(deps.storage, (&info.sender, validator.clone()))?;
+    let stake_info = STAKEINFO.load(deps.storage, (&info.sender, validator.clone()))?; //
     let proxy = PROXY.load(deps.storage, &info.sender)?;
     if amount > stake_info.staked {
         return Err(ContractError::InvalidUnstakeAmount {});
@@ -216,7 +216,7 @@ fn exec_handle_unstake(
         contract_addr: config.cw20contract,
         msg: to_binary(&Cw20ExecuteMsg::BurnFrom { owner: info.sender.to_string(), amount })?,
         funds: vec![],
-    })            
+    })
     .add_attribute("action", "unstake")
     .add_attribute("from", &info.sender)
     .add_attribute("to", &env.contract.address)
@@ -265,7 +265,7 @@ fn exec_handle_redelegation(
         true => {
             STAKEINFO.update(deps.storage, (&info.sender, to.clone()), |x| -> StdResult<_> {
             let mut ret = x.unwrap();
-            ret.staked = ret.staked.checked_sub(amount).unwrap();
+            ret.staked = ret.staked.checked_add(amount).unwrap();
             Ok(ret)
         })?;
         },

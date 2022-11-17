@@ -1,6 +1,6 @@
-QSTAKING_ID=12
-QSTAKING_PROXY_ID=11
-CW20_ID=6
+QSTAKING_ID=16
+QSTAKING_PROXY_ID=14
+CW20_ID=15
 INIT_MSG="{\"denom\" : \"udarc\", \"cw20_id\" : $CW20_ID, \"cw20_label\": \"crates.io:cw20-base\", \"token_name\": \"qdarc\", \"token_symbol\": \"qdarc\", \"proxy_id\": $QSTAKING_PROXY_ID, \"proxy_label\": \"knstl_qstaking_proxy\", \"commission_rate\": \"0.15\", \"unbond_period\": 120}"
 
 knstld tx wasm instantiate $QSTAKING_ID $INIT_MSG --from park --label "knstl_qstaking" -y --fees 6udarc --gas 1000000 -b block --no-admin

@@ -7,6 +7,6 @@ VALI=darcvaloper16n226c7p4fkmrgxjsclln38qthulggmr9zx3sq
 STAKE_MSG1="{\"stake\": {\"validator\": \"$VALI\"}}"
 #STAKE_MSG2="{\"stake\": {\"validator\": \"$VAL_2\"}}"
 #STAKE_MSG3="{\"stake\": {\"validator\": \"$VAL_3\"}}"
-knstld tx wasm execute $DELEGATOR $STAKE_MSG1 --amount 100000000udarc --from park -y --gas 1000000 --fees 6udarc
+knstld tx wasm execute $DELEGATOR $STAKE_MSG1 --amount 1971999990udarc --from bridge1 -y --gas 1000000 --fees 6udarc
 #knstld tx wasm execute $DELEGATOR $STAKE_MSG2 --amount 50000udarc --from user -y --gas 1000000 --fees 6udarc
 #knstld tx wasm execute $DELEGATOR $STAKE_MSG3 --amount 50000udarc --from user -y --gas 1000000 --fees 6udarc
