@@ -3,7 +3,7 @@
 ## Getting Started
 
 First, you need a daemon executable to interact with chain.
-For download, see __[here.](https://github.com/psangwoo/knstld.git)__ 
+For download, see __[here.](https://github.com/knstl/konstellation.git)__ 
 
 
 ## Connect with Konstellation Testnet
@@ -24,7 +24,7 @@ keyring-backend = "test"
 # CLI output format (text|json)
 output = "text"
 # <host>:<port> to Tendermint RPC interface for this chain
-node = "tcp://goz.konstellation.tech:36657"
+node = "tcp://node7.konstellation.tech:26657"
 # Transaction broadcasting mode (sync|async|block)
 broadcast-mode = "sync"
 ```
