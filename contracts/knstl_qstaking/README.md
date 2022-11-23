@@ -42,4 +42,4 @@ With this contract, user can stake their tokens, without any reward loss, and st
 
 For basic knowledges, see __[here.](https://docs.cosmwasm.com/docs/1.0/getting-started/interact-with-contract)__
 
-For introductions, see __[here.](./INTRO.md)__
+For specifications, see __[here.](./SPEC.md)__
